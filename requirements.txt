@@ -1,0 +1,12 @@
+faster-whisper>=1.0.0
+sounddevice>=0.4.6
+numpy>=1.24.0
+customtkinter>=5.2.0
+Pillow>=10.0.0
+keyboard>=0.13.5
+zhconv>=1.4.0
+pypinyin>=0.50.0
+funasr>=1.0.0
+torch>=2.0.0
+python-dateutil>=2.8.0
+plyer>=2.1.0
