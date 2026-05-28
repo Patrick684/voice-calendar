@@ -1,0 +1,244 @@
+"""基于正则的指令识别引擎 - 解析语音文本中的操作意图"""
+
+import re
+import logging
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Optional
+
+from command.time_parser import TimeParser
+
+logger = logging.getLogger(__name__)
+
+
+class CommandType(Enum):
+    """指令类型"""
+    ADD_EVENT = "add_event"       # 添加事件
+    DELETE_EVENT = "delete_event"  # 删除事件
+    QUERY_EVENT = "query_event"   # 查询事件
+    UPDATE_EVENT = "update_event"  # 修改事件
+    UNKNOWN = "unknown"           # 无法识别
+
+
+@dataclass
+class ParsedCommand:
+    """解析后的指令结果
+
+    属性:
+        command_type: 指令类型
+        title: 事件标题（从文本中提取）
+        time: 解析出的时间
+        end_time: 结束时间（可选）
+        original_text: 原始输入文本
+        confidence: 置信度 (0.0~1.0)
+    """
+    command_type: CommandType
+    title: str = ""
+    time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    original_text: str = ""
+    confidence: float = 0.0
+
+
+class RuleEngine:
+    """基于正则的指令识别引擎
+
+    通过关键词匹配和正则表达式识别语音文本中的操作意图，
+    配合 TimeParser 提取时间实体。
+    """
+
+    # 添加事件的触发关键词
+    ADD_KEYWORDS = [
+        "添加", "新增", "新建", "创建", "安排", "记录", "预约",
+        "提醒我", "帮我记", "设个", "定个", "加个", "加一个",
+    ]
+
+    # 删除事件的触发关键词
+    DELETE_KEYWORDS = [
+        "删除", "取消", "去掉", "删掉", "移除", "撤销", "不要了",
+        "取消掉", "删了",
+    ]
+
+    # 查询事件的触发关键词
+    QUERY_PHRASES = [
+        "有什么安排", "有什么日程", "有什么事项", "有什么计划",
+        "有哪些安排", "有哪些日程",
+        "查看日程", "查看行程", "查看安排",
+        "看看日程", "看看行程", "看看安排",
+    ]
+
+    # 查询单个关键词（优先级低于添加/删除，作为后备）
+    QUERY_KEYWORDS = [
+        "查看", "看看", "有什么", "有哪些",
+        "日程", "行程", "计划", "待办", "待办事项", "事项",
+    ]
+
+    # 修改事件的触发关键词
+    UPDATE_KEYWORDS = [
+        "修改", "改一下", "改成", "更改", "调整", "推迟",
+        "提前", "改到", "改为",
+    ]
+
+    # 用于清理标题中的噪音词
+    TITLE_NOISE_WORDS = [
+        "一个", "一条", "一下", "帮我", "请", "给我", "要",
+        "把", "将", "那个", "这个",
+    ]
+
+    # 标题首部噪音词（包含助词）
+    TITLE_LEAD_NOISE = ["的", "了", "吧", "呢", "啊", "一个", "一条"]
+
+    def __init__(self):
+        self._time_parser = TimeParser()
+        # 预编译正则（按优先级排列，长词优先）
+        self._add_pattern = self._build_keyword_pattern(self.ADD_KEYWORDS)
+        self._delete_pattern = self._build_keyword_pattern(self.DELETE_KEYWORDS)
+        self._query_phrase_pattern = self._build_keyword_pattern(self.QUERY_PHRASES)
+        self._query_pattern = self._build_keyword_pattern(self.QUERY_KEYWORDS)
+        self._update_pattern = self._build_keyword_pattern(self.UPDATE_KEYWORDS)
+
+    def parse(self, text: str) -> ParsedCommand:
+        """解析输入文本
+
+        Args:
+            text: 语音识别后的文本
+
+        Returns:
+            ParsedCommand 解析结果
+        """
+        text = text.strip()
+        if not text:
+            return ParsedCommand(
+                command_type=CommandType.UNKNOWN, original_text=text
+            )
+
+        # 按优先级依次匹配
+        for cmd_type, pattern in [
+            (CommandType.DELETE_EVENT, self._delete_pattern),
+            (CommandType.UPDATE_EVENT, self._update_pattern),
+            (CommandType.QUERY_EVENT, self._query_phrase_pattern),  # 查询短语优先
+            (CommandType.ADD_EVENT, self._add_pattern),
+            (CommandType.QUERY_EVENT, self._query_pattern),  # 查询关键词后置
+        ]:
+            match = pattern.search(text)
+            if match:
+                return self._extract_details(cmd_type, text, match)
+
+        # 无法匹配到关键词，尝试隐式添加（有时间 + 标题的模式）
+        implicit = self._try_implicit_add(text)
+        if implicit is not None:
+            return implicit
+
+        return ParsedCommand(
+            command_type=CommandType.UNKNOWN,
+            original_text=text,
+            confidence=0.0,
+        )
+
+    def _build_keyword_pattern(self, keywords: list) -> re.Pattern:
+        """构建关键词匹配正则（长词优先，避免子串冲突）"""
+        sorted_kw = sorted(keywords, key=len, reverse=True)
+        escaped = [re.escape(kw) for kw in sorted_kw]
+        pattern_str = "|".join(escaped)
+        return re.compile(f"(?:{pattern_str})")
+
+    def _extract_details(
+        self,
+        cmd_type: CommandType,
+        text: str,
+        keyword_match: re.Match,
+    ) -> ParsedCommand:
+        """从文本中提取指令详情（时间、标题）
+
+        Args:
+            cmd_type: 指令类型
+            text: 原始文本
+            keyword_match: 关键词匹配结果
+
+        Returns:
+            ParsedCommand
+        """
+        # 移除关键词，剩余部分用于提取时间和标题
+        text_without_keyword = (
+            text[:keyword_match.start()] + text[keyword_match.end():]
+        ).strip()
+
+        # 解析时间
+        parsed_time, remaining = self._time_parser.parse(text_without_keyword)
+
+        # 清理标题
+        title = self._clean_title(remaining)
+
+        # 查询指令不需要标题，时间范围就是查询条件
+        if cmd_type == CommandType.QUERY_EVENT:
+            # 如果原文中没有解析到时间，检查关键词是否包含时间信息
+            if parsed_time is None:
+                parsed_time, _ = self._time_parser.parse(text)
+            return ParsedCommand(
+                command_type=cmd_type,
+                title=title,
+                time=parsed_time,
+                original_text=text,
+                confidence=0.85,
+            )
+
+        return ParsedCommand(
+            command_type=cmd_type,
+            title=title,
+            time=parsed_time,
+            original_text=text,
+            confidence=0.8,
+        )
+
+    def _try_implicit_add(self, text: str) -> Optional[ParsedCommand]:
+        """尝试隐式添加指令（无明确关键词，但有时间+标题）
+
+        例如："明天下午三点开会" → 隐式添加事件
+
+        Args:
+            text: 输入文本
+
+        Returns:
+            ParsedCommand 或 None
+        """
+        parsed_time, remaining = self._time_parser.parse(text)
+        if parsed_time is not None:
+            title = self._clean_title(remaining)
+            if title:
+                return ParsedCommand(
+                    command_type=CommandType.ADD_EVENT,
+                    title=title,
+                    time=parsed_time,
+                    original_text=text,
+                    confidence=0.6,  # 隐式指令置信度较低
+                )
+        return None
+
+    def _clean_title(self, text: str) -> str:
+        """清理事件标题，去除噪音词和多余空白
+
+        Args:
+            text: 待清理文本
+
+        Returns:
+            清理后的标题
+        """
+        if not text:
+            return ""
+
+        # 去除噪音词
+        for word in self.TITLE_NOISE_WORDS:
+            text = text.replace(word, "")
+
+        # 去除首尾的连词、助词和标点
+        text = re.sub(r"^[，,、\s]+|[，,。.!！?？\s]+$", "", text)
+        # 去除首部助词（的/了/吧等）
+        for lead_word in self.TITLE_LEAD_NOISE:
+            while text.startswith(lead_word):
+                text = text[len(lead_word):].strip()
+
+        # 合并多余空白
+        text = re.sub(r"\s+", " ", text).strip()
+
+        return text
