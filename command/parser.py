@@ -9,6 +9,7 @@
 
 import logging
 import re
+from datetime import datetime
 from typing import Optional, List
 
 from command.rule_engine import RuleEngine, CommandType, ParsedCommand
@@ -100,7 +101,9 @@ class CommandParser:
                 "将回退到规则引擎"
             )
 
-    def parse(self, text: str) -> ParsedCommand:
+    def parse(
+        self, text: str, base_date: Optional[datetime] = None
+    ) -> ParsedCommand:
         """解析语音指令
 
         解析优先级：
@@ -111,6 +114,7 @@ class CommandParser:
 
         Args:
             text: 语音识别后的文本
+            base_date: 基准日期（用于日期上下文继承），默认使用当天
 
         Returns:
             ParsedCommand 解析结果
@@ -127,12 +131,12 @@ class CommandParser:
 
         # 0. 意图分类模型预测
         if self._intent_classifier is not None:
-            model_result = self._parse_with_model(text)
+            model_result = self._parse_with_model(text, base_date=base_date)
             if model_result is not None:
                 return model_result
 
         # 1. 规则引擎解析
-        rule_result = self._rule_engine.parse(text)
+        rule_result = self._rule_engine.parse(text, base_date=base_date)
         logger.info(
             f"规则引擎结果: type={rule_result.command_type.value}, "
             f"confidence={rule_result.confidence}, title='{rule_result.title}'"
@@ -161,7 +165,9 @@ class CommandParser:
             confidence=0.0,
         )
 
-    def _parse_with_model(self, text: str) -> Optional[ParsedCommand]:
+    def _parse_with_model(
+        self, text: str, base_date: Optional[datetime] = None
+    ) -> Optional[ParsedCommand]:
         """使用意图分类模型解析
 
         采用动态置信度阈值：
@@ -203,7 +209,7 @@ class CommandParser:
             return None
 
         # 仍用 RuleEngine 提取时间/标题槽位
-        rule_result = self._rule_engine.parse(text)
+        rule_result = self._rule_engine.parse(text, base_date=base_date)
         return ParsedCommand(
             command_type=cmd_type,
             title=rule_result.title,
@@ -238,8 +244,22 @@ class CommandParser:
         r"|[一二两三四五六七八九十]+点)"
     )
 
+    # 日期引用检测（用于多指令日期上下文继承）
+    # 只匹配日期级关键词，不含时段（上午/下午）和具体时间（X点）
+    _DATE_REFERENCE_PATTERN = re.compile(
+        r"(?:大后天|后天|明天|今天|今日|今晚|明晚"
+        r"|(?:下|这)?(?:周|星期)[一二三四五六日天]"
+        r"|\d{1,2}月\d{1,2}[号日]"
+        r"|\d+天后)"
+    )
+
     # ASR 标点修复用的已知时间词
     _ASR_TIME_WORDS = {"上午", "下午", "中午", "晚上", "早上", "凌晨", "傍晚"}
+
+    @staticmethod
+    def _has_date_reference(text: str) -> bool:
+        """检查文本是否含明确日期引用（明天/后天/X月X号等）"""
+        return CommandParser._DATE_REFERENCE_PATTERN.search(text) is not None
 
     @staticmethod
     def _fix_asr_punctuation(text: str) -> str:
@@ -306,6 +326,10 @@ class CommandParser:
 
         分三层拆分：ASR 纠错 → 连接词/标点 → 时间触发词 → 碎片过滤 → 逐句解析。
 
+        日期上下文继承:
+          维护 current_date 变量，遇到明确日期引用时更新，
+          未识别到日期的片段继承上文的日期上下文。
+
         Args:
             text: 语音识别后的完整文本
 
@@ -332,10 +356,23 @@ class CommandParser:
             result = self.parse(text)
             return [result] if result.command_type != CommandType.UNKNOWN else []
 
-        # 第三层：逐段解析
+        # 日期上下文：初始为 None（默认今天），遇到明确日期时更新
+        current_date: Optional[datetime] = None
         results: List[ParsedCommand] = []
+
         for segment in all_segments:
-            cmd = self.parse(segment)
+            # 检测当前片段是否含明确日期引用（明天/后天/X月X号等）
+            if self._has_date_reference(segment):
+                # 有日期引用：始终用今天作基准（不走上下文继承）
+                cmd = self.parse(segment)
+                if cmd.time is not None:
+                    current_date = cmd.time.replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
+            else:
+                # 无日期引用，继承上文日期上下文
+                cmd = self.parse(segment, base_date=current_date)
+
             # 过滤无法识别或标题为空的添加事件
             if cmd.command_type == CommandType.UNKNOWN:
                 logger.debug(f"多指令解析: 忽略无法识别的片段 '{segment}'")
@@ -346,6 +383,7 @@ class CommandParser:
             results.append(cmd)
             logger.info(
                 f"多指令解析: '{segment}' -> {cmd.command_type.value}"
+                f"{' [继承日期:' + current_date.strftime('%m/%d') + ']' if current_date else ''}"
             )
 
         return results

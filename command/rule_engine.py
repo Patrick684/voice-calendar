@@ -99,11 +99,12 @@ class RuleEngine:
         self._query_pattern = self._build_keyword_pattern(self.QUERY_KEYWORDS)
         self._update_pattern = self._build_keyword_pattern(self.UPDATE_KEYWORDS)
 
-    def parse(self, text: str) -> ParsedCommand:
+    def parse(self, text: str, base_date: Optional[datetime] = None) -> ParsedCommand:
         """解析输入文本
 
         Args:
             text: 语音识别后的文本
+            base_date: 基准日期（用于日期上下文继承），默认使用当天
 
         Returns:
             ParsedCommand 解析结果
@@ -124,10 +125,10 @@ class RuleEngine:
         ]:
             match = pattern.search(text)
             if match:
-                return self._extract_details(cmd_type, text, match)
+                return self._extract_details(cmd_type, text, match, base_date)
 
         # 无法匹配到关键词，尝试隐式添加（有时间 + 标题的模式）
-        implicit = self._try_implicit_add(text)
+        implicit = self._try_implicit_add(text, base_date)
         if implicit is not None:
             return implicit
 
@@ -149,6 +150,7 @@ class RuleEngine:
         cmd_type: CommandType,
         text: str,
         keyword_match: re.Match,
+        base_date: Optional[datetime] = None,
     ) -> ParsedCommand:
         """从文本中提取指令详情（时间、标题）
 
@@ -166,7 +168,9 @@ class RuleEngine:
         ).strip()
 
         # 解析时间
-        parsed_time, remaining = self._time_parser.parse(text_without_keyword)
+        parsed_time, remaining = self._time_parser.parse(
+            text_without_keyword, base_date=base_date
+        )
 
         # 清理标题
         title = self._clean_title(remaining)
@@ -175,7 +179,7 @@ class RuleEngine:
         if cmd_type == CommandType.QUERY_EVENT:
             # 如果原文中没有解析到时间，检查关键词是否包含时间信息
             if parsed_time is None:
-                parsed_time, _ = self._time_parser.parse(text)
+                parsed_time, _ = self._time_parser.parse(text, base_date=base_date)
             return ParsedCommand(
                 command_type=cmd_type,
                 title=title,
@@ -192,18 +196,21 @@ class RuleEngine:
             confidence=0.8,
         )
 
-    def _try_implicit_add(self, text: str) -> Optional[ParsedCommand]:
+    def _try_implicit_add(
+        self, text: str, base_date: Optional[datetime] = None
+    ) -> Optional[ParsedCommand]:
         """尝试隐式添加指令（无明确关键词，但有时间+标题）
 
         例如："明天下午三点开会" → 隐式添加事件
 
         Args:
             text: 输入文本
+            base_date: 基准日期（用于日期上下文继承）
 
         Returns:
             ParsedCommand 或 None
         """
-        parsed_time, remaining = self._time_parser.parse(text)
+        parsed_time, remaining = self._time_parser.parse(text, base_date=base_date)
         if parsed_time is not None:
             title = self._clean_title(remaining)
             if title:

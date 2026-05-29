@@ -325,6 +325,83 @@ def test_parse_multiple_real_world():
     print()
 
 
+def test_date_context_inheritance():
+    """测试多指令日期上下文继承"""
+    print("=" * 50)
+    print("测试日期上下文继承")
+    print("=" * 50)
+
+    parser = CommandParser(llm_enabled=False)
+    now = datetime.now()
+    tomorrow = now + timedelta(days=1)
+    day_after = now + timedelta(days=2)
+
+    # 1. 同日期连续事件："明天早上8点起床下午3点开会"
+    #    "下午3点" 应继承 "明天"
+    results = parser.parse_multiple("明天早上8点起床下午3点开会")
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) == 2, f"期望 2 条，实际 {len(add_results)}"
+    assert add_results[0].time.day == tomorrow.day, \
+        f"第1条期望明天，实际 {add_results[0].time.strftime('%m-%d')}"
+    assert add_results[0].time.hour == 8
+    assert add_results[1].time.day == tomorrow.day, \
+        f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
+    assert add_results[1].time.hour == 15
+    print(f"  [通过] 同日期继承: '起床'={add_results[0].time.strftime('%m-%d %H:%M')}, "
+          f"'开会'={add_results[1].time.strftime('%m-%d %H:%M')}")
+
+    # 2. 日期切换："后天上午10点面试6月1号早上9点买高铁票"
+    #    "后天" 应解析为后天，"6月1号" 应更新上下文并绑定给"买高铁票"
+    results = parser.parse_multiple("后天上午10点面试6月1号早上9点买高铁票")
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) == 2, f"期望 2 条，实际 {len(add_results)}"
+    r1 = add_results[0]
+    assert r1.time.day == day_after.day, \
+        f"第1条期望后天({day_after.strftime('%m-%d')})，实际 {r1.time.strftime('%m-%d')}"
+    r2 = add_results[1]
+    assert r2.time.month == 6 and r2.time.day == 1, \
+        f"第2条期望 06-01，实际 {r2.time.strftime('%m-%d')}"
+    print(f"  [通过] 日期切换: '面试'={r1.time.strftime('%m-%d %H:%M')}, "
+          f"'买高铁票'={r2.time.strftime('%m-%d %H:%M')}")
+
+    # 3. 完整场景："明天早上8点起床下午3点有个会后天上，午10点有个面试6月1号早上9点买高铁票"
+    text = "明天早上8点起床下午3点有个会后天上，午10点有个面试6月1号早上9点买高铁票"
+    results = parser.parse_multiple(text)
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) == 4, \
+        f"期望 4 条，实际 {len(add_results)}: {[r.title for r in add_results]}"
+    # 第1条：明天 08:00 起床
+    assert add_results[0].time.day == tomorrow.day
+    assert add_results[0].time.hour == 8
+    # 第2条：明天 15:00 有个会（继承明天）
+    assert add_results[1].time.day == tomorrow.day, \
+        f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
+    assert add_results[1].time.hour == 15
+    # 第3条：后天 10:00 面试
+    assert add_results[2].time.day == day_after.day, \
+        f"第3条期望后天，实际 {add_results[2].time.strftime('%m-%d')}"
+    assert add_results[2].time.hour == 10
+    # 第4条：6月1号 09:00 买高铁票
+    assert add_results[3].time.month == 6 and add_results[3].time.day == 1
+    assert add_results[3].time.hour == 9
+    print("  [通过] 完整场景 4 事件:")
+    for r in add_results:
+        print(f"         - '{r.title}' @ {r.time.strftime('%m-%d %H:%M')}")
+
+    # 4. base_date 参数直接传递测试
+    from command.time_parser import TimeParser
+    tp = TimeParser()
+    base = datetime(2026, 6, 15)
+    parsed_time, _ = tp.parse("下午三点开会", base_date=base)
+    assert parsed_time is not None
+    assert parsed_time.day == 15 and parsed_time.month == 6, \
+        f"base_date 未生效，期望 06-15，实际 {parsed_time.strftime('%m-%d')}"
+    assert parsed_time.hour == 15
+    print(f"  [通过] base_date 直传: '下午三点' + base=06-15 -> {parsed_time.strftime('%m-%d %H:%M')}")
+
+    print()
+
+
 def test_intent_classifier_import():
     """测试 IntentClassifier 导入和基本接口"""
     print("=" * 50)
@@ -484,6 +561,7 @@ if __name__ == "__main__":
         test_fuzzy_correction()
         test_parse_multiple()
         test_parse_multiple_real_world()
+        test_date_context_inheritance()
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()

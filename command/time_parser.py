@@ -55,11 +55,14 @@ class TimeParser:
     # 时段对 12 小时制的影响
     PERIOD_PM_OFFSET = {"下午", "晚上", "晚间", "傍晚"}
 
-    def parse(self, text: str) -> Tuple[Optional[datetime], str]:
+    def parse(
+        self, text: str, base_date: Optional[datetime] = None
+    ) -> Tuple[Optional[datetime], str]:
         """解析文本中的时间表达式
 
         Args:
             text: 输入文本
+            base_date: 基准日期（用于日期上下文继承），默认使用当天
 
         Returns:
             (解析出的 datetime, 剩余文本)
@@ -68,25 +71,26 @@ class TimeParser:
         # 近音纠错预处理
         text = self._fuzzy_correct_time_keywords(text)
 
-        now = datetime.now()
-        base_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        # 基准日期：外部传入（多指令上下文继承）或默认当天
+        ref = base_date if base_date is not None else datetime.now()
+        today = ref.replace(hour=0, minute=0, second=0, microsecond=0)
         result_time = None
         remaining = text
 
         # 1. 解析相对日期（今天/明天/后天/大后天/N天后）
-        date_result, remaining = self._parse_relative_date(remaining, base_date)
+        date_result, remaining = self._parse_relative_date(remaining, today)
         if date_result is not None:
             result_time = date_result
 
         # 2. 解析 "下周X"
         if result_time is None:
-            weekday_result, remaining = self._parse_next_weekday(remaining, now)
+            weekday_result, remaining = self._parse_next_weekday(remaining, ref)
             if weekday_result is not None:
                 result_time = weekday_result
 
         # 3. 解析 "X月X号" / "X号"
         if result_time is None:
-            month_day_result, remaining = self._parse_month_day(remaining, now)
+            month_day_result, remaining = self._parse_month_day(remaining, ref)
             if month_day_result is not None:
                 result_time = month_day_result
 
@@ -104,7 +108,7 @@ class TimeParser:
             if period_result in self.PERIOD_PM_OFFSET and hour < 12:
                 hour += 12
             if result_time is None:
-                result_time = now.replace(
+                result_time = ref.replace(
                     hour=hour, minute=minute, second=0, microsecond=0
                 )
             else:
@@ -112,7 +116,7 @@ class TimeParser:
         elif period_hour is not None:
             # 只有时段没有具体时间，使用时段默认值
             if result_time is None:
-                result_time = now.replace(
+                result_time = ref.replace(
                     hour=period_hour, minute=0, second=0, microsecond=0
                 )
             else:
