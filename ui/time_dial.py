@@ -50,7 +50,7 @@ class TimeDial(ctk.CTkFrame):
         self._hover_slot = -1
 
         self._setup_canvas()
-        self._draw()
+        self._redraw()
 
     def _setup_canvas(self):
         """创建 Canvas"""
@@ -71,7 +71,7 @@ class TimeDial(ctk.CTkFrame):
         self._canvas.bind("<Motion>", self._on_hover)
         self._canvas.bind("<Leave>", self._on_leave)
 
-    def _draw(self):
+    def _redraw(self):
         """绘制标尺"""
         c = self._canvas
         c.delete("all")
@@ -161,12 +161,12 @@ class TimeDial(ctk.CTkFrame):
         if event_id is not None:
             slot = start_time.hour * 2 + (1 if start_time.minute >= 30 else 0)
             self._current_slot = max(0, min(slot, self._TOTAL_SLOTS - 1))
-        self._draw()
+        self._redraw()
 
     def clear(self):
         """清除选中状态"""
         self._event_id = None
-        self._draw()
+        self._redraw()
 
     def _x_to_slot(self, x: int) -> int:
         """将鼠标 X 坐标转换为 slot 索引"""
@@ -197,7 +197,7 @@ class TimeDial(ctk.CTkFrame):
         slot = self._x_to_slot(event.x)
         if slot != self._current_slot:
             self._current_slot = slot
-            self._draw()
+            self._redraw()
 
     def _on_release(self, event):
         """释放"""
@@ -207,16 +207,16 @@ class TimeDial(ctk.CTkFrame):
             if self._on_time_change and self._event_id is not None:
                 self._on_time_change(hour, minute)
             logger.info(f"拨盘调整: {hour:02d}:{minute:02d}")
-        self._draw()
+        self._redraw()
 
     def _on_hover(self, event):
         """悬停"""
         slot = self._x_to_slot(event.x)
         if slot != self._hover_slot:
             self._hover_slot = slot
-            self._draw()
+            self._redraw()
 
     def _on_leave(self, event):
         """离开"""
         self._hover_slot = -1
-        self._draw()
+        self._redraw()
