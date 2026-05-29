@@ -1,9 +1,11 @@
 """语音日历工具主程序 - 集成语音识别与日历管理的桌面应用"""
 
 import os
+import json
 import logging
 import threading
 import queue
+from pathlib import Path
 from typing import Optional
 
 # 配置 HuggingFace 国内镜像
@@ -261,9 +263,36 @@ class VoiceCalendarApp:
                 logger.info(f"执行指令: type={cmd.command_type.value}, title='{cmd.title}'")
                 self._execute_command(cmd)
 
+            # 5. 记录到交互日志（用于回放测试和模型训练）
+            for cmd in commands:
+                self._log_interaction(text, cmd)
+
         except Exception as e:
             logger.error(f"语音处理失败: {e}", exc_info=True)
             self._result_queue.put(("voice_state", VoiceState.ERROR, str(e)))
+
+    def _log_interaction(self, text: str, cmd):
+        """将语音交互记录追加到日志文件（用于回放测试和模型训练）
+
+        Args:
+            text: 原始语音文本
+            cmd: 解析后的指令结果
+        """
+        log_file = Path("tests/interaction_log.jsonl")
+        entry = {
+            "text": text,
+            "label": cmd.command_type.value,
+            "expected_title": cmd.title,
+            "expected_recurrence": cmd.recurrence_rule or "",
+            "confidence": cmd.confidence,
+            "note": "自动记录",
+            "accepted": True,
+        }
+        try:
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.warning(f"交互日志写入失败: {e}")
 
     def _run_post_process(self, text: str) -> str:
         """执行后处理链

@@ -148,6 +148,8 @@ class RuleEngine:
         "大约",
         "大概",
         "差不多",
+        "小时",
+        "分钟",
     ]
 
     # 标题首部噪音词（包含助词）
@@ -335,7 +337,7 @@ class RuleEngine:
                     priority=self._detect_priority(text),
                     recurrence_rule=recurrence_rule,
                     original_text=text,
-                    confidence=0.6,  # 隐式指令置信度较低
+                    confidence=0.75,  # 时间解析成功是强信号，隐式指令置信度可提高
                 )
         return None
 
@@ -423,8 +425,12 @@ class RuleEngine:
         for word in self.TITLE_NOISE_WORDS:
             text = text.replace(word, "")
 
+        # 去除优先级关键词（避免“必须完成报告”这类标题）
+        for word in self.PRIORITY_URGENT_WORDS + self.PRIORITY_IMPORTANT_WORDS + self.PRIORITY_CRITICAL_WORDS:
+            text = text.replace(word, "")
+
         # 去除首尾的连词、助词和标点
-        text = re.sub(r"^[，,、\s]+|[，,。.!！?？\s]+$", "", text)
+        text = re.sub(r"^[\uff0c,\u3001\s]+|[\uff0c,\u3002.!\uff01?\uff1f\s]+$", "", text)
         # 去除首部助词（的/了/吧等）
         for lead_word in self.TITLE_LEAD_NOISE:
             while text.startswith(lead_word):
@@ -452,11 +458,22 @@ class RuleEngine:
     @classmethod
     def _build_delete_command(cls, text: str) -> ParsedCommand:
         """构建否定式删除指令（提取被否定的标题）"""
-        # 尝试提取被否定的标题
+        # 尝试提取被否定的标题（跳过“不/别”前缀，只捕获实际动作）
         title_match = re.search(
-            r"(?:今天|明天|昨天|后天|下周[一二三四五六日天]?|这周[一二三四五六日天]?)?(?:上午|下午|晚上|早上)?(?:\d{1,2}[点时])?([\u4e00-\u9fa5]+?)(?:了|啦)",
+            r"(?:今天|明天|昨天|后天|下周[一二三四五六日天]?|这周[一二三四五六日天]?)?"
+            r"(?:上午|下午|晚上|早上|中午)?"
+            r"(?:\d{1,2}[点时](?:半)?)?"
+            r"不([\u4e00-\u9fa5]+?)(?:了|啦)",
             text,
         )
+        if not title_match:
+            title_match = re.search(
+                r"(?:今天|明天|昨天|后天|下周[一二三四五六日天]?|这周[一二三四五六日天]?)?"
+                r"(?:上午|下午|晚上|早上|中午)?"
+                r"(?:\d{1,2}[点时](?:半)?)?"
+                r"别([\u4e00-\u9fa5]+?)(?:了|啦)",
+                text,
+            )
         title = title_match.group(1) if title_match else ""
         return ParsedCommand(
             command_type=CommandType.DELETE_EVENT,
