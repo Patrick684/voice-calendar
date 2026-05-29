@@ -1,0 +1,23 @@
+feat: 拖拽排序 + 打卡日历 + 成就体系
+
+## 功能描述
+实现 Task 6（拖拽排序）和 Task 9（打卡日历 + 趋势图 + 成就体系）
+- 月视图事件拖拽：右键拖拽事件卡片到其他日期格子，自动更新事件日期
+- 事件卡片增强：分类颜色条、优先级标记（★/❗）、分类标签显示
+- 排序模式切换：工具栏新增「时间排序/优先级排序」切换按钮
+- Ctrl+Z 撤销拖拽操作（最多 20 步）
+- 统计引擎：月度分类完成率、热力图数据、趋势分析、连续打卡天数
+- 成就系统：10 个规则驱动的成就（初次启程/小有成就/日程达人/效率大师/连续打卡/分类专家）
+- 统计视图：三标签页（热力图日历 + 分类统计 + 成就徽章）
+
+## 实现思路
+- main_window.py: 添加拖拽状态管理、排序模式、撤销栈，增强事件卡片渲染
+- stats.py: StatsEngine 类，基于 SQLiteStorage 计算完成率/热力图/趋势/连续打卡
+- achievement.py: AchievementEngine 类，lambda 规则检测 + JSON 持久化
+- stats_view.py: CustomTkinter 多标签页视图，热力图日历/分类卡片/成就徽章
+- manager.py: 暴露 storage property 供 StatsEngine 使用
+- main.py: 初始化引擎并传入 MainWindow，添加事件后自动检查成就
+
+## 测试方法
+运行 python -m tests.verify_command 执行全部测试
+新增 test_stats_engine() 和 test_achievement_engine() 测试函数

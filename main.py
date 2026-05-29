@@ -21,6 +21,8 @@ from engine.text_corrector import TextCorrector
 from hotkey.hotkey_manager import HotkeyManager
 from calendar_pkg.manager import CalendarManager
 from calendar_pkg.reminder import ReminderScheduler
+from calendar_pkg.stats import StatsEngine
+from calendar_pkg.achievement import AchievementEngine
 from command.parser import CommandParser, CommandType
 from command.completion import CommandCompleter
 from ui.main_window import MainWindow
@@ -117,6 +119,14 @@ class VoiceCalendarApp:
         # 指令补全器
         self._completer = CommandCompleter()
 
+        # 统计与成就引擎
+        self._stats_engine = StatsEngine(self._calendar.storage)
+        self._achievement_engine = AchievementEngine(
+            self._stats_engine,
+            save_path=str(self.config.data_dir / "achievements.json")
+            if hasattr(self.config, 'data_dir') else "achievements.json",
+        )
+
         # 提醒调度器
         self._reminder = ReminderScheduler(
             calendar_manager=self._calendar,
@@ -152,6 +162,8 @@ class VoiceCalendarApp:
             on_settings=self._open_settings,
             on_voice_start=self._on_record_start,
             on_voice_stop=self._on_record_stop,
+            stats_engine=self._stats_engine,
+            achievement_engine=self._achievement_engine,
         )
         self._main_window.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -331,6 +343,14 @@ class VoiceCalendarApp:
         time_str = command.time.strftime("%m月%d日 %H:%M")
         msg = f"已添加: {command.title} ({time_str})"
         logger.info(msg)
+
+        # 检查成就解锁
+        new_achievements = self._achievement_engine.check_achievements()
+        if new_achievements:
+            ach_names = ", ".join(a["name"] for a in new_achievements)
+            msg += f" | 🏆 解锁成就: {ach_names}"
+            logger.info(f"成就解锁: {ach_names}")
+
         self._result_queue.put(("command_executed", msg, "add"))
 
     def _execute_delete_event(self, command):

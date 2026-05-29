@@ -181,6 +181,13 @@ def test_fuzzy_correction():
     print("测试 TimeParser 近音纠错")
     print("=" * 50)
 
+    try:
+        import pypinyin  # noqa: F401
+    except ImportError:
+        print("  [跳过] pypinyin 未安装，无法测试近音纠错")
+        print()
+        return
+
     parser = TimeParser()
 
     # “名天”应纠错为“明天”（同音异字）
@@ -823,6 +830,96 @@ def test_soft_delete_restore():
     print()
 
 
+def test_stats_engine():
+    """测试统计引擎"""
+    print("=" * 50)
+    print("测试统计引擎")
+    print("=" * 50)
+
+    import tempfile
+    from calendar_pkg.manager import CalendarManager
+    from calendar_pkg.stats import StatsEngine
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        mgr = CalendarManager(db_path=db_path)
+        stats = StatsEngine(mgr.storage)
+
+        now = datetime.now()
+        # 创建几个事件
+        mgr.add_event(title="跑步", start_time=now - timedelta(days=1, hours=2), category="健康")
+        mgr.add_event(title="开会", start_time=now - timedelta(days=1, hours=1), category="工作")
+        mgr.add_event(title="学习Python", start_time=now + timedelta(hours=1), category="学习")
+        mgr.add_event(title="看电影", start_time=now + timedelta(days=2), category="娱乐")
+
+        # 月度统计
+        monthly = stats.get_monthly_stats(now.year, now.month)
+        assert "健康" in monthly or "工作" in monthly
+        print(f"  [通过] 月度统计: {len(monthly)} 个分类")
+
+        # 热力图数据
+        heatmap = stats.get_heatmap_data(now.year, now.month)
+        assert len(heatmap) > 0
+        print(f"  [通过] 热力图: {len(heatmap)} 天有事件")
+
+        # 趋势数据
+        trend = stats.get_trend_data(days=7)
+        assert len(trend) > 0
+        print(f"  [通过] 趋势数据: {len(trend)} 天")
+
+        # 分类汇总
+        summary = stats.get_category_summary()
+        assert sum(summary.values()) == 4
+        print(f"  [通过] 分类汇总: {summary}")
+
+    print()
+
+
+def test_achievement_engine():
+    """测试成就系统"""
+    print("=" * 50)
+    print("测试成就系统")
+    print("=" * 50)
+
+    import tempfile
+    from calendar_pkg.manager import CalendarManager
+    from calendar_pkg.stats import StatsEngine
+    from calendar_pkg.achievement import AchievementEngine
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        ach_path = os.path.join(tmpdir, "achievements.json")
+        mgr = CalendarManager(db_path=db_path)
+        stats_engine = StatsEngine(mgr.storage)
+        ach_engine = AchievementEngine(stats_engine, save_path=ach_path)
+
+        # 创建事件前检查
+        all_ach = ach_engine.get_all_achievements()
+        assert len(all_ach) > 0
+        assert ach_engine.get_unlocked_count() == 0
+        print(f"  [通过] 初始状态: {ach_engine.get_total_count()} 个成就, 0 解锁")
+
+        # 创建一个事件后检查
+        mgr.add_event(title="测试事件", start_time=datetime.now())
+        new_achs = ach_engine.check_achievements()
+        # 应该解锁 "初次启程"
+        assert len(new_achs) >= 1
+        assert any(a["id"] == "first_event" for a in new_achs)
+        print(f"  [通过] 解锁成就: {[a['name'] for a in new_achs]}")
+
+        # 再次检查不应重复解锁
+        new_achs2 = ach_engine.check_achievements()
+        assert len(new_achs2) == 0
+        print(f"  [通过] 不重复解锁")
+
+        # 持久化检查
+        ach_engine2 = AchievementEngine(stats_engine, save_path=ach_path)
+        assert ach_engine2.get_unlocked_count() >= 1
+        print(f"  [通过] 成就持久化")
+
+    print()
+
+
 def test_reminder_sound_and_dnd():
     """测试个性化提醒音效和免打扰"""
     print("=" * 50)
@@ -1089,6 +1186,8 @@ if __name__ == "__main__":
         test_past_date_parsing()
         test_backup_export_import()
         test_soft_delete_restore()
+        test_stats_engine()
+        test_achievement_engine()
         test_reminder_sound_and_dnd()
         test_command_completion()
         test_intent_classifier_import()

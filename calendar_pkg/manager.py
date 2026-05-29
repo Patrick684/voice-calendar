@@ -34,6 +34,11 @@ class CalendarManager:
         self._classifier = EventClassifier()
         logger.info(f"日历管理器已初始化，数据库: {db_path}")
 
+    @property
+    def storage(self) -> SQLiteStorage:
+        """暴露底层 storage（供 StatsEngine 等使用）"""
+        return self._storage
+
     # ================================================================
     # CRUD 操作
     # ================================================================

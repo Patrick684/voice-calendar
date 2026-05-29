@@ -1,16 +1,20 @@
-"""主窗口 - 日历视图 + 事件列表 + 语音面板"""
+"""主窗口 - 日历视图 + 事件列表 + 语音面板 + 拖拽排序"""
 
 import calendar as cal_mod
 import logging
-from datetime import datetime
-from typing import Optional, Callable, List
+from collections import deque
+from datetime import datetime, timedelta
+from typing import Optional, Callable, List, Dict
 
 import customtkinter as ctk
 
 from calendar_pkg.event import CalendarEvent
 from calendar_pkg.manager import CalendarManager
+from calendar_pkg.stats import StatsEngine
+from calendar_pkg.achievement import AchievementEngine
 from ui.voice_panel import VoicePanel, VoiceState
 from ui.event_dialog import EventDialog
+from ui.stats_view import StatsView
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +35,8 @@ class MainWindow(ctk.CTk):
         on_settings: Optional[Callable] = None,
         on_voice_start: Optional[Callable] = None,
         on_voice_stop: Optional[Callable] = None,
+        stats_engine: Optional[StatsEngine] = None,
+        achievement_engine: Optional[AchievementEngine] = None,
     ):
         """
         初始化主窗口
@@ -46,6 +52,8 @@ class MainWindow(ctk.CTk):
         self._on_settings = on_settings
         self._on_voice_start = on_voice_start
         self._on_voice_stop = on_voice_stop
+        self._stats_engine = stats_engine
+        self._achievement_engine = achievement_engine
 
         # 当前显示的年月
         self._view_year = datetime.now().year
@@ -58,10 +66,30 @@ class MainWindow(ctk.CTk):
         # 按钮录音即时状态标记（避免轮询延迟导致竞态）
         self._is_recording = False
 
+        # 拖拽状态
+        self._drag_data: Dict = {"event": None, "source_date": None, "widget": None}
+        self._day_cells: Dict[str, ctk.CTkButton] = {}  # date_str -> cell widget
+
+        # 撤销栈
+        self._undo_stack: deque = deque(maxlen=20)
+
+        # 事件列表排序模式
+        self._sort_mode = "time"  # "time" 或 "priority"
+
+        # 分类颜色（从配置获取，使用默认值）
+        self._category_colors: Dict[str, str] = {
+            "工作": "#2196F3", "健康": "#4CAF50", "学习": "#FF9800",
+            "生活": "#9C27B0", "娱乐": "#E91E63", "社交": "#00BCD4",
+            "其他": "#757575",
+        }
+
         self._setup_window()
         self._setup_ui()
         self._refresh_calendar()
         self._refresh_event_list()
+
+        # 绑定 Ctrl+Z 撤销
+        self.bind("<Control-z>", self._on_undo)
 
     def _setup_window(self):
         """配置窗口属性"""
@@ -133,10 +161,23 @@ class MainWindow(ctk.CTk):
             command=self._open_settings,
         ).pack(side="right", padx=(5, 10), pady=8)
 
+        if self._stats_engine and self._achievement_engine:
+            ctk.CTkButton(
+                self._toolbar, text="📈 统计", width=80,
+                command=self._open_stats,
+            ).pack(side="right", padx=5, pady=8)
+
         ctk.CTkButton(
             self._toolbar, text="+ 添加事件", width=100,
             command=lambda: self._open_event_dialog(),
         ).pack(side="right", padx=5, pady=8)
+
+        # 排序模式切换
+        self._sort_btn = ctk.CTkButton(
+            self._toolbar, text="⏱ 时间排序", width=100,
+            command=self._toggle_sort_mode,
+        )
+        self._sort_btn.pack(side="right", padx=5, pady=8)
 
     def _setup_calendar_view(self):
         """构建月历视图"""
@@ -236,9 +277,9 @@ class MainWindow(ctk.CTk):
         self, row, col, day, date_str,
         is_today, is_selected, has_event,
     ):
-        """创建单个日期格子"""
-        bg_color = "#f0f0f0"  # 浅灰底
-        text_color = "#333333"  # 深灰/黑色字
+        """创建单个日期格子（支持拖拽放置）"""
+        bg_color = "#f0f0f0"
+        text_color = "#333333"
 
         if is_selected:
             bg_color = "#3498db"
@@ -259,8 +300,15 @@ class MainWindow(ctk.CTk):
         )
         cell.grid(row=row, column=col, sticky="nsew", padx=1, pady=1)
 
+        # 拖拽放置目标
+        cell.bind("<Enter>", lambda e, ds=date_str: self._on_drag_enter(ds))
+        cell.bind("<Leave>", lambda e, ds=date_str: self._on_drag_leave(ds))
+        cell.bind("<ButtonRelease-3>", lambda e, ds=date_str: self._on_drag_drop(ds))
+
+        self._day_cells[date_str] = cell
+
     def _setup_event_list_for_date(self, date_str: str):
-        """刷新指定日期的事件列表"""
+        """刷新指定日期的事件列表（支持排序模式）"""
         # 清空旧内容
         for widget in self._event_scroll.winfo_children():
             widget.destroy()
@@ -271,6 +319,12 @@ class MainWindow(ctk.CTk):
             return
 
         events = self._manager.get_events_by_date(date)
+
+        # 排序
+        if self._sort_mode == "priority":
+            events.sort(key=lambda e: (-e.priority, e.start_time))
+        # 默认按时间排序（已由 storage 返回有序列表）
+
         self._event_list_label.configure(
             text=f"{date_str} 的事件 ({len(events)})"
         )
@@ -289,34 +343,55 @@ class MainWindow(ctk.CTk):
             self._create_event_card(event)
 
     def _create_event_card(self, event: CalendarEvent):
-        """创建事件卡片"""
+        """创建事件卡片（含分类颜色条 + 拖拽支持）"""
         card = ctk.CTkFrame(self._event_scroll, corner_radius=8)
         card.pack(fill="x", pady=3)
+
+        # 分类颜色条
+        cat_color = self._category_colors.get(event.category, "#757575")
+        color_bar = ctk.CTkFrame(card, width=4, fg_color=cat_color, corner_radius=2)
+        color_bar.pack(side="left", fill="y", padx=(5, 0), pady=3)
+
+        # 内容区
+        content = ctk.CTkFrame(card, fg_color="transparent")
+        content.pack(side="left", fill="both", expand=True)
 
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
         title_text = f"{time_str}  {event.title}"
 
+        # 优先级标记
+        priority_marker = ""
+        if event.priority >= 2:
+            priority_marker = " ❗"
+        elif event.priority == 1:
+            priority_marker = " ★"
+
         ctk.CTkLabel(
-            card, text=title_text,
+            content, text=title_text + priority_marker,
             font=ctk.CTkFont(size=13),
             anchor="w",
         ).pack(fill="x", padx=10, pady=(8, 2))
 
         if event.description:
             ctk.CTkLabel(
-                card, text=event.description,
+                content, text=event.description,
                 font=ctk.CTkFont(size=11),
                 text_color="gray",
                 anchor="w",
                 wraplength=250,
             ).pack(fill="x", padx=10, pady=(0, 5))
 
+        # 分类 + 标签行
+        info_parts = []
+        if event.category:
+            info_parts.append(f"[{event.category}]")
         if event.tags:
-            tags_text = "  ".join(f"[{t}]" for t in event.tags)
+            info_parts.extend(f"[{t}]" for t in event.tags)
+        if info_parts:
             ctk.CTkLabel(
-                card, text=tags_text,
+                content, text="  ".join(info_parts),
                 font=ctk.CTkFont(size=10),
-                text_color="#3498db",
+                text_color=cat_color,
                 anchor="w",
             ).pack(fill="x", padx=10, pady=(0, 5))
 
@@ -324,6 +399,126 @@ class MainWindow(ctk.CTk):
         card.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
         for child in card.winfo_children():
             child.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
+            for grandchild in child.winfo_children():
+                grandchild.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
+
+        # 拖拽开始（仅真实事件支持，虚拟循环实例不可拖拽）
+        if event.id is not None:
+            card.bind("<ButtonPress-3>", lambda e, ev=event: self._on_drag_start(e, ev))
+            for child in card.winfo_children():
+                child.bind("<ButtonPress-3>", lambda e, ev=event: self._on_drag_start(e, ev))
+
+    # ================================================================
+    # 拖拽排序
+    # ================================================================
+
+    def _on_drag_start(self, event, cal_event: CalendarEvent):
+        """拖拽开始（右键拖拽）"""
+        self._drag_data = {
+            "event": cal_event,
+            "source_date": cal_event.start_time.strftime("%Y-%m-%d"),
+            "widget": event.widget,
+        }
+        # 视觉反馈：高亮源日期格子
+        source_cell = self._day_cells.get(self._drag_data["source_date"])
+        if source_cell:
+            source_cell.configure(fg_color="#e67e22")
+
+    def _on_drag_enter(self, date_str: str):
+        """拖拽进入日期格子"""
+        if self._drag_data.get("event") is None:
+            return
+        cell = self._day_cells.get(date_str)
+        if cell:
+            cell.configure(fg_color="#27ae60")
+
+    def _on_drag_leave(self, date_str: str):
+        """拖拽离开日期格子"""
+        if self._drag_data.get("event") is None:
+            return
+        # 恢复原始颜色
+        self._refresh_calendar()
+
+    def _on_drag_drop(self, target_date_str: str):
+        """拖拽放置到目标日期"""
+        cal_event = self._drag_data.get("event")
+        if cal_event is None or cal_event.id is None:
+            self._drag_data = {"event": None, "source_date": None, "widget": None}
+            return
+
+        source_date_str = self._drag_data["source_date"]
+        if source_date_str == target_date_str:
+            # 拖到同一天，无操作
+            self._drag_data = {"event": None, "source_date": None, "widget": None}
+            self._refresh_calendar()
+            return
+
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+            new_start = cal_event.start_time.replace(
+                year=target_date.year,
+                month=target_date.month,
+                day=target_date.day,
+            )
+            new_end = None
+            if cal_event.end_time:
+                new_end = cal_event.end_time.replace(
+                    year=target_date.year,
+                    month=target_date.month,
+                    day=target_date.day,
+                )
+
+            # 记录撤销信息
+            self._undo_stack.append({
+                "event_id": cal_event.id,
+                "old_start": cal_event.start_time,
+                "old_end": cal_event.end_time,
+            })
+
+            # 更新事件日期
+            self._manager.update_event(
+                cal_event.id,
+                start_time=new_start,
+                end_time=new_end,
+            )
+            logger.info(
+                f"拖拽移动事件: {cal_event.title} "
+                f"{source_date_str} -> {target_date_str}"
+            )
+        except Exception as e:
+            logger.error(f"拖拽失败: {e}")
+
+        # 重置拖拽状态
+        self._drag_data = {"event": None, "source_date": None, "widget": None}
+        self._refresh_calendar()
+        self._refresh_event_list()
+
+    def _toggle_sort_mode(self):
+        """切换排序模式"""
+        if self._sort_mode == "time":
+            self._sort_mode = "priority"
+            self._sort_btn.configure(text="★ 优先级排序")
+        else:
+            self._sort_mode = "time"
+            self._sort_btn.configure(text="⏱ 时间排序")
+        self._refresh_event_list()
+
+    def _on_undo(self, event=None):
+        """Ctrl+Z 撤销上次拖拽"""
+        if not self._undo_stack:
+            return
+        action = self._undo_stack.pop()
+        try:
+            self._manager.update_event(
+                action["event_id"],
+                start_time=action["old_start"],
+                end_time=action["old_end"],
+            )
+            logger.info(f"撤销拖拽: event_id={action['event_id']}")
+            self._refresh_calendar()
+            self._refresh_event_list()
+        except Exception as e:
+            logger.error(f"撤销失败: {e}")
 
     # ================================================================
     # 事件处理
@@ -369,6 +564,15 @@ class MainWindow(ctk.CTk):
         """打开设置"""
         if self._on_settings:
             self._on_settings()
+
+    def _open_stats(self):
+        """打开统计与成就视图"""
+        if self._stats_engine and self._achievement_engine:
+            StatsView(
+                self,
+                stats_engine=self._stats_engine,
+                achievement_engine=self._achievement_engine,
+            )
 
     def _open_event_dialog(self, event: Optional[CalendarEvent] = None):
         """打开事件编辑对话框"""
