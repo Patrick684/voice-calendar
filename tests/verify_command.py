@@ -673,6 +673,62 @@ def test_category_storage_roundtrip():
     print()
 
 
+def test_past_date_parsing():
+    """测试过去日期解析"""
+    print("=" * 50)
+    print("测试过去日期解析")
+    print("=" * 50)
+
+    parser = TimeParser()
+    now = datetime.now()
+    yesterday = now - timedelta(days=1)
+    day_before = now - timedelta(days=2)
+
+    # 昨天
+    result, remaining = parser.parse("昨天下午三点开会")
+    assert result is not None
+    assert result.day == yesterday.day, f"期望昨天({yesterday.strftime('%m-%d')})，实际 {result.strftime('%m-%d')}"
+    assert result.hour == 15
+    print(f"  [通过] 昨天: {result.strftime('%m-%d %H:%M')}")
+
+    # 前天
+    result, remaining = parser.parse("前天上午十点看牙")
+    assert result is not None
+    assert result.day == day_before.day, f"期望前天({day_before.strftime('%m-%d')})，实际 {result.strftime('%m-%d')}"
+    print(f"  [通过] 前天: {result.strftime('%m-%d %H:%M')}")
+
+    # 3天前
+    result, remaining = parser.parse("3天前下午两点健身")
+    assert result is not None
+    expected = now - timedelta(days=3)
+    assert result.day == expected.day, f"期望 3 天前({expected.strftime('%m-%d')})，实际 {result.strftime('%m-%d')}"
+    print(f"  [通过] 3天前: {result.strftime('%m-%d %H:%M')}")
+
+    # 上周X
+    result, remaining = parser.parse("上周五下午三点开会")
+    assert result is not None
+    assert result.weekday() == 4, f"期望周五(4)，实际 weekday={result.weekday()}"
+    assert result < now, "上周五应是过去日期"
+    print(f"  [通过] 上周五: {result.strftime('%m-%d %H:%M')} (weekday={result.weekday()})")
+
+    # 过去事件创建
+    import tempfile
+    from calendar_pkg.manager import CalendarManager
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        mgr = CalendarManager(db_path=db_path)
+        event = mgr.add_event(
+            title="昨天的会议",
+            start_time=yesterday.replace(hour=15, minute=0),
+        )
+        assert event.id is not None
+        loaded = mgr.get_event(event.id)
+        assert loaded is not None
+        print(f"  [通过] 过去事件创建: {loaded.title} @ {loaded.start_time.strftime('%m-%d %H:%M')}")
+
+    print()
+
+
 def test_intent_classifier_import():
     """测试 IntentClassifier 导入和基本接口"""
     print("=" * 50)
@@ -838,6 +894,7 @@ if __name__ == "__main__":
         test_category_storage_roundtrip()
         test_recurrence_detection()
         test_recurrence_expansion()
+        test_past_date_parsing()
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()

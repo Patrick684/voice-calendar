@@ -2,8 +2,10 @@
 
 支持的表达形式：
 - 今天/明天/后天/大后天 + 上午/下午/晚上 + 具体时间
+- 昨天/前天/大前天 + 具体时间（过去日期）
+- 上周X/上星期X（过去星期）
 - 下周一/下周二.../下周日
-- N天后/N小时后
+- N天后/N小时前/N分钟前/N天前
 - X月X号/X号
 - 具体时间：三点/三点半/十五点/15:00
 """
@@ -24,7 +26,10 @@ class TimeParser:
         "明天": ["ming", "tian"],
         "后天": ["hou", "tian"],
         "今天": ["jin", "tian"],
+        "昨天": ["zuo", "tian"],
+        "前天": ["qian", "tian"],
         "大后天": ["da", "hou", "tian"],
+        "大前天": ["da", "qian", "tian"],
         "今晚": ["jin", "wan"],
         "明晚": ["ming", "wan"],
         "上午": ["shang", "wu"],
@@ -129,11 +134,14 @@ class TimeParser:
     def _parse_relative_date(
         self, text: str, base_date: datetime
     ) -> Tuple[Optional[datetime], str]:
-        """解析相对日期：今天/明天/后天/大后天/N天后"""
+        """解析相对日期：今天/明天/后天/大后天/昨天/前天/N天后/N天前"""
         patterns = [
             (r"大后天", 3),
+            (r"大前天", -3),
             (r"后天", 2),
+            (r"前天", -2),
             (r"明天", 1),
+            (r"昨天|昨日", -1),
             (r"今天|今日", 0),
             (r"今晚|今天晚上|明晚|明天晚上", None),  # 特殊处理
         ]
@@ -155,12 +163,18 @@ class TimeParser:
                         result = base_date
                     return result, remaining
 
-        # N天后 / N小时后 / N分钟后
+        # N天后 / N天前 / N小时后 / N分钟后
         match = re.search(r"(\d+|[一二两三四五六七八九十]+)\s*天后", text)
         if match:
             n = self._cn_to_int(match.group(1))
             remaining = text[:match.start()] + text[match.end():]
             return base_date + timedelta(days=n), remaining
+
+        match = re.search(r"(\d+|[一二两三四五六七八九十]+)\s*天前", text)
+        if match:
+            n = self._cn_to_int(match.group(1))
+            remaining = text[:match.start()] + text[match.end():]
+            return base_date - timedelta(days=n), remaining
 
         match = re.search(r"(\d+|[一二两三四五六七八九十]+)\s*小时后", text)
         if match:
@@ -179,7 +193,21 @@ class TimeParser:
     def _parse_next_weekday(
         self, text: str, now: datetime
     ) -> Tuple[Optional[datetime], str]:
-        """解析 下周X"""
+        """解析 下周X / 上周X / 周X"""
+        # 上周X / 上星期X（过去）
+        match = re.search(r"上(周|星期)([一二三四五六日天])", text)
+        if match:
+            target_weekday = self.WEEKDAY_MAP[match.group(2)]
+            current_weekday = now.weekday()
+            days_back = (current_weekday - target_weekday) % 7
+            if days_back == 0:
+                days_back = 7
+            result = now.replace(
+                hour=9, minute=0, second=0, microsecond=0
+            ) - timedelta(days=days_back)
+            remaining = text[:match.start()] + text[match.end():]
+            return result, remaining
+
         match = re.search(r"下(周|星期)([一二三四五六日天])", text)
         if match:
             target_weekday = self.WEEKDAY_MAP[match.group(2)]
