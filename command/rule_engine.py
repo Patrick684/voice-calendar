@@ -124,6 +124,10 @@ class RuleEngine:
         "提前",
         "改到",
         "改为",
+        "向前推",
+        "往后推",
+        "挪到",
+        "移到",
     ]
 
     # 用于清理标题中的噪音词
@@ -224,7 +228,11 @@ class RuleEngine:
             if match:
                 return self._extract_details(cmd_type, text, match, base_date)
 
-        # 无法匹配到关键词，尝试隐式添加（有时间 + 标题的模式）
+        # 无法匹配到关键词，尝试否定式删除（“不X了”、“别X了”）
+        if self._detect_negation_delete(text):
+            return self._build_delete_command(text)
+
+        # 尝试隐式添加（有时间 + 标题的模式）
         implicit = self._try_implicit_add(text, base_date)
         if implicit is not None:
             return implicit
@@ -262,17 +270,17 @@ class RuleEngine:
         # 移除关键词，剩余部分用于提取时间和标题
         text_without_keyword = (text[: keyword_match.start()] + text[keyword_match.end() :]).strip()
 
-        # 解析时间
-        parsed_time, remaining = self._time_parser.parse(text_without_keyword, base_date=base_date)
-
         # 检测优先级
         priority = self._detect_priority(text)
 
-        # 检测循环规则
-        recurrence_rule, text_without_recurrence = self._detect_recurrence(text_without_keyword)
-        # 如果从去关键词文本中未检测到，尝试从原始文本检测
+        # 先检测循环规则（必须在时间解析前，否则时间解析器会吞噬"周六"等导致无法匹配"每周六"）
+        recurrence_rule, text_clean = self._detect_recurrence(text_without_keyword)
         if not recurrence_rule:
             recurrence_rule, _ = self._detect_recurrence(text)
+            text_clean = text_without_keyword
+
+        # 解析时间（使用已去除循环词的文本）
+        parsed_time, remaining = self._time_parser.parse(text_clean, base_date=base_date)
 
         # 清理标题
         title = self._clean_title(remaining)
@@ -313,7 +321,10 @@ class RuleEngine:
         Returns:
             ParsedCommand 或 None
         """
-        parsed_time, remaining = self._time_parser.parse(text, base_date=base_date)
+        # 先检测循环规则（必须在时间解析前，否则时间解析器会吞噬"周六"等导致无法匹配"每周六"）
+        recurrence_rule, text_clean = self._detect_recurrence(text)
+
+        parsed_time, remaining = self._time_parser.parse(text_clean, base_date=base_date)
         if parsed_time is not None:
             title = self._clean_title(remaining)
             if title:
@@ -322,7 +333,7 @@ class RuleEngine:
                     title=title,
                     time=parsed_time,
                     priority=self._detect_priority(text),
-                    recurrence_rule=self._detect_recurrence(text)[0],
+                    recurrence_rule=recurrence_rule,
                     original_text=text,
                     confidence=0.6,  # 隐式指令置信度较低
                 )
@@ -423,3 +434,33 @@ class RuleEngine:
         text = re.sub(r"\s+", " ", text).strip()
 
         return text
+
+    @staticmethod
+    def _detect_negation_delete(text: str) -> bool:
+        """检测否定式删除语义（“不X了”、“别X了”、“不用X了”）"""
+        negation_patterns = [
+            r"不[\u4e00-\u9fa5]{1,6}了",
+            r"别[\u4e00-\u9fa5]{1,6}了",
+            r"不用[\u4e00-\u9fa5]{1,6}了",
+            r"不[\u4e00-\u9fa5]{1,6}啦",
+        ]
+        for pat in negation_patterns:
+            if re.search(pat, text):
+                return True
+        return False
+
+    @classmethod
+    def _build_delete_command(cls, text: str) -> ParsedCommand:
+        """构建否定式删除指令（提取被否定的标题）"""
+        # 尝试提取被否定的标题
+        title_match = re.search(
+            r"(?:今天|明天|昨天|后天|下周[一二三四五六日天]?|这周[一二三四五六日天]?)?(?:上午|下午|晚上|早上)?(?:\d{1,2}[点时])?([\u4e00-\u9fa5]+?)(?:了|啦)",
+            text,
+        )
+        title = title_match.group(1) if title_match else ""
+        return ParsedCommand(
+            command_type=CommandType.DELETE_EVENT,
+            title=title,
+            original_text=text,
+            confidence=0.7,
+        )

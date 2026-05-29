@@ -1175,6 +1175,58 @@ def test_parser_with_intent_model():
     print()
 
 
+def test_interaction_log_regressions():
+    """回归测试：验证实际语音交互日志中暴露的问题"""
+    print("=" * 50)
+    print("测试实际交互日志回归问题")
+    print("=" * 50)
+
+    engine = RuleEngine()
+    now = datetime.now()
+
+    # P0: 循环触发词不应吞噬标题
+    result = engine.parse("每周六下午五点健身")
+    assert result.command_type == CommandType.ADD_EVENT, f"期望 add_event, 得到 {result.command_type}"
+    assert "每" not in result.title, f"标题含循环触发词: '{result.title}'"
+    assert result.title == "健身", f"标题应为'健身', 实际为'{result.title}'"
+    assert result.recurrence_rule == "FREQ=WEEKLY;BYDAY=SA", f"循环规则错误: '{result.recurrence_rule}'"
+    print(f"  [通过] 循环标题: '{result.title}', 规则: {result.recurrence_rule}")
+
+    result2 = engine.parse("每天早上九点起床")
+    assert "每天" not in result2.title, f"标题含循环触发词: '{result2.title}'"
+    assert result2.title == "起床", f"标题应为'起床', 实际为'{result2.title}'"
+    assert result2.recurrence_rule == "FREQ=DAILY", f"循环规则错误: '{result2.recurrence_rule}'"
+    print(f"  [通过] 循环标题: '{result2.title}', 规则: {result2.recurrence_rule}")
+
+    # P0: 同日期不应解析到下一年
+    today_str = f"{now.month}月{now.day}号"
+    result3 = engine.parse(f"{today_str}晚上七点吃饭")
+    assert result3.time is not None, f"解析失败: {today_str}晚上七点吃饭"
+    assert result3.time.year == now.year, f"同日期不应跳到下一年: {result3.time}"
+    print(f"  [通过] 同日期: '{today_str}晚上七点' → {result3.time.strftime('%Y-%m-%d %H:%M')}")
+
+    # P1: "不 X 了"应识别为删除
+    result4 = engine.parse("今天中午十二点不吃外卖了")
+    assert result4.command_type == CommandType.DELETE_EVENT, f"'不X了'应为 delete, 实际为 {result4.command_type}"
+    print(f"  [通过] 否定删除: '不吃外卖了' → {result4.command_type.value}")
+
+    result5 = engine.parse("今天下午八点不上课了")
+    assert result5.command_type == CommandType.DELETE_EVENT, f"'不X了'应为 delete, 实际为 {result5.command_type}"
+    print(f"  [通过] 否定删除: '不上课了' → {result5.command_type.value}")
+
+    # P1: "向前推"应识别为修改
+    result6 = engine.parse("六月一号的面试向前推一个小时")
+    assert result6.command_type == CommandType.UPDATE_EVENT, f"'向前推'应为 update, 实际为 {result6.command_type}"
+    print(f"  [通过] 时间调整: '向前推一个小时' → {result6.command_type.value}")
+
+    # P1: "挪到"应识别为修改
+    result7 = engine.parse("活动挪到三十号")
+    assert result7.command_type == CommandType.UPDATE_EVENT, f"'挪到'应为 update, 实际为 {result7.command_type}"
+    print(f"  [通过] 时间调整: '挪到三十号' → {result7.command_type.value}")
+
+    print()
+
+
 if __name__ == "__main__":
     print("\n指令解析层功能验证\n")
     try:
@@ -1200,6 +1252,7 @@ if __name__ == "__main__":
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()
+        test_interaction_log_regressions()
         print("=" * 50)
         print("全部测试通过!")
         print("=" * 50)

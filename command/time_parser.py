@@ -256,8 +256,8 @@ class TimeParser:
             year = now.year
             try:
                 result = datetime(year, month, day, 9, 0, 0)
-                # 如果日期已过，推到明年
-                if result < now:
+                # 如果日期（月+日）已过，推到明年（比较日期而非时间，避免当天说“今天”被推到明年）
+                if (month, day) < (now.month, now.day):
                     result = result.replace(year=year + 1)
                 remaining = text[: match.start()] + text[match.end() :]
                 return result, remaining
@@ -270,8 +270,8 @@ class TimeParser:
             day = self._cn_to_int(match.group(1))
             try:
                 result = now.replace(day=day, hour=9, minute=0, second=0, microsecond=0)
-                if result < now:
-                    # 推到下个月
+                # 如果日期已过，推到下个月（比较日期而非时间，避免当天说“今天”被推到下月）
+                if day < now.day:
                     if now.month == 12:
                         result = result.replace(year=now.year + 1, month=1)
                     else:

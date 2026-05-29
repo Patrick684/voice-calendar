@@ -165,7 +165,7 @@ class HotwordManager:
     }
 
     # 预置分类默认激活状态
-    BUILTIN_DEFAULT_ACTIVE = ["科技编程", "日历日程"]
+    BUILTIN_DEFAULT_ACTIVE = ["日历日程"]
 
     def __init__(self, hotword_file: Optional[str] = None):
         """
