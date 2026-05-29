@@ -11,9 +11,9 @@ from datetime import datetime, timedelta
 # 将项目根目录加入路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from calendar.event import CalendarEvent
-from calendar.storage import SQLiteStorage
-from calendar.manager import CalendarManager
+from calendar_pkg.event import CalendarEvent
+from calendar_pkg.storage import SQLiteStorage
+from calendar_pkg.manager import CalendarManager
 
 
 def test_calendar_event():

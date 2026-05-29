@@ -19,8 +19,8 @@ from engine.punctuation_restorer import PunctuationRestorer
 from engine.post_processor import PostProcessor
 from engine.text_corrector import TextCorrector
 from hotkey.hotkey_manager import HotkeyManager
-from calendar.manager import CalendarManager
-from calendar.reminder import ReminderScheduler
+from calendar_pkg.manager import CalendarManager
+from calendar_pkg.reminder import ReminderScheduler
 from command.parser import CommandParser, CommandType
 from ui.main_window import MainWindow
 from ui.settings_window import SettingsWindow

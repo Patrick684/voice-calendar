@@ -7,8 +7,8 @@ from typing import Optional, Callable, List
 
 import customtkinter as ctk
 
-from calendar.event import CalendarEvent
-from calendar.manager import CalendarManager
+from calendar_pkg.event import CalendarEvent
+from calendar_pkg.manager import CalendarManager
 from ui.voice_panel import VoicePanel, VoiceState
 from ui.event_dialog import EventDialog
 

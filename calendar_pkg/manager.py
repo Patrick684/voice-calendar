@@ -4,8 +4,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from calendar.event import CalendarEvent
-from calendar.storage import SQLiteStorage
+from calendar_pkg.event import CalendarEvent
+from calendar_pkg.storage import SQLiteStorage
 
 logger = logging.getLogger(__name__)
 

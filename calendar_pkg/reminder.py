@@ -6,8 +6,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Set
 
-from calendar.event import CalendarEvent
-from calendar.manager import CalendarManager
+from calendar_pkg.event import CalendarEvent
+from calendar_pkg.manager import CalendarManager
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ import customtkinter as ctk
 from datetime import datetime, timedelta
 from typing import Optional, Callable
 
-from calendar.event import CalendarEvent
+from calendar_pkg.event import CalendarEvent
 
 
 class EventDialog(ctk.CTkToplevel):

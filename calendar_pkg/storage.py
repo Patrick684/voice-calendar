@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from calendar.event import CalendarEvent
+from calendar_pkg.event import CalendarEvent
 
 logger = logging.getLogger(__name__)
 
