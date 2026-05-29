@@ -32,3 +32,12 @@
 {"text": "6月1日 凌晨3点 不开会了。", "label": "delete_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
 {"text": "这株每天下午两点都要五岁。", "label": "add_event", "expected_title": "午睡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "Whisper误识别(这株→这周, 五岁→午睡)，ASR修正后可解析", "accepted": false}
 {"text": "这一周每天下，午两点都要五睡。", "label": "add_event", "expected_title": "午睡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "Whisper插入逗号(下，午→下午) + 误识别(五睡→午睡)，ASR修正后可解析", "accepted": false}
+{"text": "这周每天下午两点都要午睡。", "label": "add_event", "expected_title": "都午睡", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周每天早上十点都要起床。", "label": "add_event", "expected_title": "都起床", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午三点健身。", "label": "add_event", "expected_title": "健身", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午三点不健身了上午十，点面试后天上午十点的面试取消。", "label": "delete_event", "expected_title": "健身", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "明天下午三点不健身了上午十，点面试后天上午十点的面试取消。", "label": "delete_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "今天上午十点不出门了晚上八点不上课了明天晚，上八点上课凌晨两点看英雄联盟比赛挪到后天两点。", "label": "delete_event", "expected_title": "出门", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "今天上午十点不出门了晚上八点不上课了明天晚，上八点上课凌晨两点看英雄联盟比赛挪到后天两点。", "label": "delete_event", "expected_title": "上课", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "今天上午十点不出门了晚上八点不上课了明天晚，上八点上课凌晨两点看英雄联盟比赛挪到后天两点。", "label": "add_event", "expected_title": "上课", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天上午十点不出门了晚上八点不上课了明天晚，上八点上课凌晨两点看英雄联盟比赛挪到后天两点。", "label": "update_event", "expected_title": "看英雄联盟比赛", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}

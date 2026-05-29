@@ -260,9 +260,29 @@ class CommandParser:
         return re.sub(r"(.)[，,、](.)", _try_merge, text)
 
     def _has_event_content(self, text: str) -> bool:
-        """检查文本是否包含事件内容（非纯时间表达式）"""
+        """检查文本是否包含事件内容（非纯时间表达式）
+
+        时间词、循环词（每天/每周/每月等）、周引用（这周/下周等）都不算事件内容。
+        """
         _, remaining = self._rule_engine._time_parser.parse(text)
+        # 去除标点和空白
         remaining = re.sub(r"[，,.。！!？?\s]", "", remaining)
+        # 去除循环关键词（这些是时间修饰语，不是事件内容）
+        recurrence_words = [
+            "每天",
+            "每日",
+            "每周",
+            "每月",
+            "每年",
+            "每个工作日",
+            "每个星期",
+            "工作日",
+            "这周",
+            "下周",
+            "上周",
+        ]
+        for word in recurrence_words:
+            remaining = remaining.replace(word, "")
         return len(remaining) > 0
 
     def _split_by_time_triggers(self, segment: str) -> list:
