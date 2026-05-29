@@ -215,6 +215,7 @@ class CommandParser:
             title=rule_result.title,
             time=rule_result.time,
             end_time=rule_result.end_time,
+            priority=rule_result.priority,
             original_text=text,
             confidence=confidence,
         )

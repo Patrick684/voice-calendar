@@ -18,7 +18,7 @@ class SQLiteStorage:
     """
 
     # 数据库表结构版本（用于未来迁移）
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, db_path: str):
         """
@@ -40,7 +40,7 @@ class SQLiteStorage:
         return conn
 
     def _init_db(self):
-        """初始化数据库表结构"""
+        """初始化数据库表结构并执行迁移"""
         conn = self._get_connection()
         try:
             conn.executescript("""
@@ -67,11 +67,8 @@ class SQLiteStorage:
                     value TEXT
                 );
             """)
-            # 写入 schema 版本
-            conn.execute(
-                "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
-                ("schema_version", str(self.SCHEMA_VERSION)),
-            )
+            # 检查并执行 schema 迁移
+            self._migrate(conn)
             conn.commit()
             logger.info(f"数据库初始化完成: {self._db_path}")
         except Exception as e:
@@ -79,6 +76,34 @@ class SQLiteStorage:
             raise
         finally:
             conn.close()
+
+    def _migrate(self, conn: sqlite3.Connection):
+        """执行增量 schema 迁移"""
+        cursor = conn.execute(
+            "SELECT value FROM metadata WHERE key = 'schema_version'"
+        )
+        row = cursor.fetchone()
+        current_version = int(row["value"]) if row else 0
+
+        if current_version < 2:
+            self._migrate_v1_to_v2(conn)
+            logger.info("Schema 迁移完成: v1 -> v2 (+priority)")
+
+        # 更新版本号
+        conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+            ("schema_version", str(self.SCHEMA_VERSION)),
+        )
+
+    @staticmethod
+    def _migrate_v1_to_v2(conn: sqlite3.Connection):
+        """v1 → v2: 新增 priority 列"""
+        try:
+            conn.execute(
+                "ALTER TABLE events ADD COLUMN priority INTEGER DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass  # 列已存在
 
     def insert_event(self, event: CalendarEvent) -> int:
         """插入新事件
@@ -98,8 +123,8 @@ class SQLiteStorage:
             cursor = conn.execute(
                 """INSERT INTO events
                    (title, start_time, end_time, description, is_all_day,
-                    reminder_minutes, tags, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    reminder_minutes, priority, tags, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     data["title"],
                     data["start_time"],
@@ -107,6 +132,7 @@ class SQLiteStorage:
                     data["description"],
                     int(data.get("is_all_day", False)),
                     data.get("reminder_minutes"),
+                    data.get("priority", 0),
                     data.get("tags", ""),
                     data.get("created_at"),
                     data.get("updated_at"),

@@ -30,6 +30,7 @@ class ParsedCommand:
         title: 事件标题（从文本中提取）
         time: 解析出的时间
         end_time: 结束时间（可选）
+        priority: 优先级（0=普通, 1=重要, 2=紧急, 3=紧急且重要）
         original_text: 原始输入文本
         confidence: 置信度 (0.0~1.0)
     """
@@ -37,6 +38,7 @@ class ParsedCommand:
     title: str = ""
     time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    priority: int = 0
     original_text: str = ""
     confidence: float = 0.0
 
@@ -89,6 +91,13 @@ class RuleEngine:
 
     # 标题首部噪音词（包含助词）
     TITLE_LEAD_NOISE = ["的", "了", "吧", "呢", "啊", "一个", "一条", "我"]
+
+    # 优先级关键词（按优先级降序排列）
+    PRIORITY_CRITICAL_WORDS = ["紧急且重要", "既紧急又重要"]
+    PRIORITY_URGENT_WORDS = [
+        "紧急", "必须", "截止", "deadline", "马上", "立刻", "尽快",
+    ]
+    PRIORITY_IMPORTANT_WORDS = ["重要", "务必", "一定", "不能忘"]
 
     def __init__(self):
         self._time_parser = TimeParser()
@@ -172,6 +181,9 @@ class RuleEngine:
             text_without_keyword, base_date=base_date
         )
 
+        # 检测优先级
+        priority = self._detect_priority(text)
+
         # 清理标题
         title = self._clean_title(remaining)
 
@@ -184,6 +196,7 @@ class RuleEngine:
                 command_type=cmd_type,
                 title=title,
                 time=parsed_time,
+                priority=priority,
                 original_text=text,
                 confidence=0.85,
             )
@@ -192,6 +205,7 @@ class RuleEngine:
             command_type=cmd_type,
             title=title,
             time=parsed_time,
+            priority=priority,
             original_text=text,
             confidence=0.8,
         )
@@ -218,10 +232,36 @@ class RuleEngine:
                     command_type=CommandType.ADD_EVENT,
                     title=title,
                     time=parsed_time,
+                    priority=self._detect_priority(text),
                     original_text=text,
                     confidence=0.6,  # 隐式指令置信度较低
                 )
         return None
+
+    @classmethod
+    def _detect_priority(cls, text: str) -> int:
+        """从文本中检测优先级关键词
+
+        Args:
+            text: 输入文本
+
+        Returns:
+            优先级值（0=普通, 1=重要, 2=紧急, 3=紧急且重要）
+        """
+        text_lower = text.lower()
+        # 检查紧急且重要（最高优先级）
+        for word in cls.PRIORITY_CRITICAL_WORDS:
+            if word in text_lower:
+                return 3
+        # 检查紧急
+        for word in cls.PRIORITY_URGENT_WORDS:
+            if word in text_lower:
+                return 2
+        # 检查重要
+        for word in cls.PRIORITY_IMPORTANT_WORDS:
+            if word in text_lower:
+                return 1
+        return 0
 
     def _clean_title(self, text: str) -> str:
         """清理事件标题，去除噪音词和多余空白

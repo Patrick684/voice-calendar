@@ -424,6 +424,48 @@ def test_date_context_inheritance():
     print()
 
 
+def test_priority_detection():
+    """测试优先级关键词自动识别"""
+    print("=" * 50)
+    print("测试优先级检测")
+    print("=" * 50)
+
+    engine = RuleEngine()
+
+    # 普通（无关键词）
+    result = engine.parse("明天下午三点开会")
+    assert result.priority == 0, f"期望 0，实际 {result.priority}"
+    print(f"  [通过] 普通: '明天下午三点开会' -> priority={result.priority}")
+
+    # 重要
+    result = engine.parse("明天下午三点重要会议")
+    assert result.priority == 1, f"期望 1，实际 {result.priority}"
+    print(f"  [通过] 重要: '明天下午三点重要会议' -> priority={result.priority}")
+
+    # 紧急
+    result = engine.parse("安排明天马上截止的项目提交")
+    assert result.priority == 2, f"期望 2，实际 {result.priority}"
+    print(f"  [通过] 紧急: '安排明天马上截止的项目提交' -> priority={result.priority}")
+
+    # 紧急且重要
+    result = engine.parse("安排紧急且重要的客户电话")
+    assert result.priority == 3, f"期望 3，实际 {result.priority}"
+    print(f"  [通过] 紧急且重要: '安排紧急且重要的客户电话' -> priority={result.priority}")
+
+    # 隐式添加也检测优先级
+    result = engine.parse("明天务必完成报告")
+    assert result.priority == 1, f"隐式期望 1，实际 {result.priority}"
+    print(f"  [通过] 隐式优先级: '明天务必完成报告' -> priority={result.priority}")
+
+    # CommandParser 透传
+    parser = CommandParser(llm_enabled=False)
+    result = parser.parse("安排明天下午立刻处理的紧急任务")
+    assert result.priority == 2, f"透传期望 2，实际 {result.priority}"
+    print(f"  [通过] CommandParser 透传: priority={result.priority}")
+
+    print()
+
+
 def test_intent_classifier_import():
     """测试 IntentClassifier 导入和基本接口"""
     print("=" * 50)
@@ -584,6 +626,7 @@ if __name__ == "__main__":
         test_parse_multiple()
         test_parse_multiple_real_world()
         test_date_context_inheritance()
+        test_priority_detection()
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()

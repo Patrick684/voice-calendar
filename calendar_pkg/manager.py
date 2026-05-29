@@ -42,6 +42,7 @@ class CalendarManager:
         is_all_day: bool = False,
         reminder_minutes: Optional[int] = None,
         tags: Optional[List[str]] = None,
+        priority: int = 0,
     ) -> CalendarEvent:
         """添加新事件
 
@@ -53,6 +54,7 @@ class CalendarManager:
             is_all_day: 是否全天事件
             reminder_minutes: 提醒分钟数（None 使用默认值）
             tags: 标签列表
+            priority: 优先级（0=普通, 1=重要, 2=紧急, 3=紧急且重要）
 
         Returns:
             创建的事件对象（含 ID）
@@ -68,6 +70,7 @@ class CalendarManager:
             is_all_day=is_all_day,
             reminder_minutes=reminder_minutes,
             tags=tags or [],
+            priority=priority,
         )
         event_id = self._storage.insert_event(event)
         event.id = event_id

@@ -17,10 +17,21 @@ class CalendarEvent:
         description: 事件描述/备注
         is_all_day: 是否全天事件
         reminder_minutes: 提前提醒分钟数（None 表示不提醒）
+        priority: 优先级（0=普通, 1=重要, 2=紧急, 3=紧急且重要）
         tags: 事件标签列表
         created_at: 创建时间
         updated_at: 最后更新时间
     """
+
+    # 优先级常量
+    PRIORITY_NORMAL = 0
+    PRIORITY_IMPORTANT = 1
+    PRIORITY_URGENT = 2
+    PRIORITY_CRITICAL = 3
+
+    PRIORITY_LABELS = {
+        0: "普通", 1: "重要", 2: "紧急", 3: "紧急且重要",
+    }
 
     title: str
     start_time: datetime
@@ -28,6 +39,7 @@ class CalendarEvent:
     description: str = ""
     is_all_day: bool = False
     reminder_minutes: Optional[int] = 15
+    priority: int = 0
     tags: List[str] = field(default_factory=list)
     id: Optional[int] = None
     created_at: Optional[str] = None
@@ -85,6 +97,7 @@ class CalendarEvent:
             description=row.get("description", ""),
             is_all_day=bool(row.get("is_all_day", 0)),
             reminder_minutes=row.get("reminder_minutes"),
+            priority=row.get("priority", 0) or 0,
             tags=tags,
             created_at=row.get("created_at"),
             updated_at=row.get("updated_at"),
@@ -113,6 +126,11 @@ class CalendarEvent:
     def is_upcoming(self) -> bool:
         """事件是否即将发生（未来事件）"""
         return self.start_time > datetime.now()
+
+    @property
+    def priority_label(self) -> str:
+        """优先级的中文标签"""
+        return self.PRIORITY_LABELS.get(self.priority, "普通")
 
     def __repr__(self) -> str:
         time_str = self.start_time.strftime("%Y-%m-%d %H:%M")
