@@ -24,6 +24,7 @@ class CalendarEvent:
         tags: 事件标签列表
         created_at: 创建时间
         updated_at: 最后更新时间
+        deleted_at: 软删除时间（None 表示未删除）
     """
 
     # 优先级常量
@@ -50,6 +51,7 @@ class CalendarEvent:
     id: Optional[int] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    deleted_at: Optional[str] = None
 
     def __post_init__(self):
         """初始化后处理：自动填充时间字段"""
@@ -110,6 +112,7 @@ class CalendarEvent:
             tags=tags,
             created_at=row.get("created_at"),
             updated_at=row.get("updated_at"),
+            deleted_at=row.get("deleted_at"),
         )
 
     @staticmethod

@@ -9,6 +9,7 @@ from dateutil.rrule import rrulestr
 from calendar_pkg.event import CalendarEvent
 from calendar_pkg.storage import SQLiteStorage
 from calendar_pkg.classifier import EventClassifier
+from calendar_pkg.backup import CalendarBackup
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +251,40 @@ class CalendarManager:
             logger.warning(f"循环事件展开失败: {event.title}, rule={event.recurrence_rule}, error={e}")
 
         return instances
+
+    # ================================================================
+    # 回收站操作
+    # ================================================================
+
+    def get_deleted_events(self) -> List[CalendarEvent]:
+        """获取回收站中的事件"""
+        return self._storage.get_deleted_events()
+
+    def restore_event(self, event_id: int) -> bool:
+        """恢复已删除的事件"""
+        return self._storage.restore_event(event_id)
+
+    def hard_delete_event(self, event_id: int) -> bool:
+        """彻底删除事件"""
+        return self._storage.hard_delete_event(event_id)
+
+    def purge_deleted(self, days: int = 30) -> int:
+        """清理超过指定天数的已删除事件"""
+        return self._storage.purge_deleted(days)
+
+    # ================================================================
+    # 备份操作
+    # ================================================================
+
+    def export_backup(self, path: str) -> int:
+        """导出备份为 JSON 文件"""
+        backup = CalendarBackup(self._storage)
+        return backup.export_json(path)
+
+    def import_backup(self, path: str, mode: str = "merge") -> dict:
+        """从 JSON 文件导入备份"""
+        backup = CalendarBackup(self._storage)
+        return backup.import_json(path, mode)
 
     # ================================================================
     # 提醒相关

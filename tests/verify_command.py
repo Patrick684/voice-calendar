@@ -729,6 +729,100 @@ def test_past_date_parsing():
     print()
 
 
+def test_backup_export_import():
+    """测试备份导出/导入"""
+    print("=" * 50)
+    print("测试备份导出/导入")
+    print("=" * 50)
+
+    import tempfile
+    from calendar_pkg.manager import CalendarManager
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        mgr = CalendarManager(db_path=db_path)
+
+        # 添加几个事件
+        mgr.add_event(title="开会", start_time=datetime.now() + timedelta(days=1))
+        mgr.add_event(title="健身", start_time=datetime.now() + timedelta(days=2))
+        mgr.add_event(title="读书", start_time=datetime.now() + timedelta(days=3))
+        assert mgr.get_event_count() == 3
+
+        # 导出
+        backup_path = os.path.join(tmpdir, "backup.json")
+        count = mgr.export_backup(backup_path)
+        assert count == 3, f"期望导出 3 条，实际 {count}"
+        assert os.path.exists(backup_path)
+        print(f"  [通过] 导出: {count} 条事件")
+
+        # 导入到新的数据库（合并模式）
+        db_path2 = os.path.join(tmpdir, "test2.db")
+        mgr2 = CalendarManager(db_path=db_path2)
+        result = mgr2.import_backup(backup_path, mode="merge")
+        assert result["imported"] == 3, f"期望导入 3 条，实际 {result}"
+        print(f"  [通过] 合并导入: {result}")
+
+        # 再次合并导入，应跳过已存在的
+        result2 = mgr2.import_backup(backup_path, mode="merge")
+        assert result2["skipped"] == 3, f"期望跳过 3 条，实际 {result2}"
+        print(f"  [通过] 重复导入跳过: {result2}")
+
+        # 覆盖模式
+        result3 = mgr2.import_backup(backup_path, mode="overwrite")
+        assert result3["imported"] == 3, f"覆盖期望导入 3 条，实际 {result3}"
+        assert mgr2.get_event_count() == 3
+        print(f"  [通过] 覆盖导入: {result3}")
+
+    print()
+
+
+def test_soft_delete_restore():
+    """测试软删除和回收站"""
+    print("=" * 50)
+    print("测试软删除与回收站")
+    print("=" * 50)
+
+    import tempfile
+    from calendar_pkg.manager import CalendarManager
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        mgr = CalendarManager(db_path=db_path)
+
+        # 创建事件
+        e1 = mgr.add_event(title="会议A", start_time=datetime.now() + timedelta(days=1))
+        e2 = mgr.add_event(title="会议B", start_time=datetime.now() + timedelta(days=2))
+        assert mgr.get_event_count() == 2
+
+        # 软删除
+        title = mgr.delete_event(e1.id)
+        assert title == "会议A"
+        print(f"  [通过] 软删除: {title}")
+
+        # 查询应排除已删除的
+        deleted = mgr.get_deleted_events()
+        assert len(deleted) == 1
+        assert deleted[0].title == "会议A"
+        print(f"  [通过] 回收站: {len(deleted)} 条")
+
+        # 恢复
+        ok = mgr.restore_event(e1.id)
+        assert ok
+        deleted_after = mgr.get_deleted_events()
+        assert len(deleted_after) == 0
+        print(f"  [通过] 恢复事件")
+
+        # 彻底删除
+        mgr.delete_event(e2.id)
+        ok = mgr.hard_delete_event(e2.id)
+        assert ok
+        deleted_final = mgr.get_deleted_events()
+        assert len(deleted_final) == 0
+        print(f"  [通过] 彻底删除")
+
+    print()
+
+
 def test_intent_classifier_import():
     """测试 IntentClassifier 导入和基本接口"""
     print("=" * 50)
@@ -895,6 +989,8 @@ if __name__ == "__main__":
         test_recurrence_detection()
         test_recurrence_expansion()
         test_past_date_parsing()
+        test_backup_export_import()
+        test_soft_delete_restore()
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()

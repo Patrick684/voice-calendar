@@ -18,7 +18,7 @@ class SQLiteStorage:
     """
 
     # 数据库表结构版本（用于未来迁移）
-    SCHEMA_VERSION = 3
+    SCHEMA_VERSION = 4
 
     def __init__(self, db_path: str):
         """
@@ -93,6 +93,10 @@ class SQLiteStorage:
             self._migrate_v2_to_v3(conn)
             logger.info("Schema 迁移完成: v2 -> v3 (+recurrence_rule, +recurrence_end)")
 
+        if current_version < 4:
+            self._migrate_v3_to_v4(conn)
+            logger.info("Schema 迁移完成: v3 -> v4 (+deleted_at)")
+
         # 更新版本号
         conn.execute(
             "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
@@ -115,7 +119,15 @@ class SQLiteStorage:
             try:
                 conn.execute(f"ALTER TABLE events ADD COLUMN {col} {default}")
             except sqlite3.OperationalError:
-                pass  # 列已存在
+                pass
+
+    @staticmethod
+    def _migrate_v3_to_v4(conn: sqlite3.Connection):
+        """v3 → v4: 新增 deleted_at 列（软删除）"""
+        try:
+            conn.execute("ALTER TABLE events ADD COLUMN deleted_at TEXT")
+        except sqlite3.OperationalError:
+            pass  # 列已存在
 
     def insert_event(self, event: CalendarEvent) -> int:
         """插入新事件
@@ -206,7 +218,34 @@ class SQLiteStorage:
             conn.close()
 
     def delete_event(self, event_id: int) -> bool:
-        """删除事件
+        """软删除事件（设置 deleted_at 时间戳）
+
+        Args:
+            event_id: 事件 ID
+
+        Returns:
+            是否删除成功
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "UPDATE events SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+                (
+                    datetime.now().isoformat(timespec="seconds"),
+                    datetime.now().isoformat(timespec="seconds"),
+                    event_id,
+                ),
+            )
+            conn.commit()
+            deleted = cursor.rowcount > 0
+            if deleted:
+                logger.info(f"事件已软删除: id={event_id}")
+            return deleted
+        finally:
+            conn.close()
+
+    def hard_delete_event(self, event_id: int) -> bool:
+        """彻底删除事件
 
         Args:
             event_id: 事件 ID
@@ -220,7 +259,7 @@ class SQLiteStorage:
             conn.commit()
             deleted = cursor.rowcount > 0
             if deleted:
-                logger.info(f"事件已删除: id={event_id}")
+                logger.info(f"事件已彻底删除: id={event_id}")
             return deleted
         finally:
             conn.close()
@@ -249,7 +288,7 @@ class SQLiteStorage:
     def get_events_by_range(
         self, start: datetime, end: datetime
     ) -> List[CalendarEvent]:
-        """查询时间范围内的事件
+        """查询时间范围内的事件（排除已删除）
 
         Args:
             start: 范围起始时间
@@ -266,6 +305,7 @@ class SQLiteStorage:
             cursor = conn.execute(
                 """SELECT * FROM events
                    WHERE start_time >= ? AND start_time <= ?
+                     AND deleted_at IS NULL
                    ORDER BY start_time ASC""",
                 (start_str, end_str),
             )
@@ -288,7 +328,8 @@ class SQLiteStorage:
         try:
             cursor = conn.execute(
                 """SELECT * FROM events
-                   WHERE title LIKE ? OR description LIKE ?
+                   WHERE (title LIKE ? OR description LIKE ?)
+                     AND deleted_at IS NULL
                    ORDER BY start_time ASC
                    LIMIT ?""",
                 (pattern, pattern, limit),
@@ -367,16 +408,78 @@ class SQLiteStorage:
             conn.close()
 
     def get_recurring_events(self) -> List[CalendarEvent]:
-        """获取所有循环事件"""
+        """获取所有循环事件（排除已删除）"""
         conn = self._get_connection()
         try:
             cursor = conn.execute(
                 """SELECT * FROM events
                    WHERE recurrence_rule IS NOT NULL
                      AND recurrence_rule != ''
+                     AND deleted_at IS NULL
                    ORDER BY start_time ASC"""
             )
             return [CalendarEvent.from_row(dict(row)) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def get_deleted_events(self) -> List[CalendarEvent]:
+        """获取所有已删除的事件（回收站）"""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                """SELECT * FROM events
+                   WHERE deleted_at IS NOT NULL
+                   ORDER BY deleted_at DESC"""
+            )
+            return [CalendarEvent.from_row(dict(row)) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def restore_event(self, event_id: int) -> bool:
+        """恢复已删除的事件
+
+        Args:
+            event_id: 事件 ID
+
+        Returns:
+            是否恢复成功
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "UPDATE events SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL",
+                (datetime.now().isoformat(timespec="seconds"), event_id),
+            )
+            conn.commit()
+            restored = cursor.rowcount > 0
+            if restored:
+                logger.info(f"事件已恢复: id={event_id}")
+            return restored
+        finally:
+            conn.close()
+
+    def purge_deleted(self, days: int = 30) -> int:
+        """彻底删除超过指定天数的已删除事件
+
+        Args:
+            days: 删除天数阈值
+
+        Returns:
+            被彻底删除的事件数量
+        """
+        from datetime import timedelta
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "DELETE FROM events WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+                (cutoff,),
+            )
+            conn.commit()
+            count = cursor.rowcount
+            if count:
+                logger.info(f"已彻底删除 {count} 条过期事件")
+            return count
         finally:
             conn.close()
 
