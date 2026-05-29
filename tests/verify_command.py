@@ -1,5 +1,5 @@
 """
-用途：验证指令解析层（time_parser/rule_engine/parser）功能是否正常
+用途：验证指令解析层（time_parser/rule_engine/parser/intent_classifier）功能是否正常
 示例：python tests/verify_command.py
 """
 
@@ -13,6 +13,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from command.time_parser import TimeParser
 from command.rule_engine import RuleEngine, CommandType
 from command.parser import CommandParser
+
+# IntentClassifier 可选（需 torch + transformers + 训练好的模型）
+_HAS_INTENT_CLASSIFIER = False
+try:
+    from command.intent_classifier import IntentClassifier
+    _HAS_INTENT_CLASSIFIER = True
+except ImportError:
+    pass
 
 
 def test_time_parser():
@@ -263,6 +271,156 @@ def test_parse_multiple():
     print()
 
 
+def test_intent_classifier_import():
+    """测试 IntentClassifier 导入和基本接口"""
+    print("=" * 50)
+    print("测试 IntentClassifier 导入")
+    print("=" * 50)
+
+    if not _HAS_INTENT_CLASSIFIER:
+        print("  [跳过] torch/transformers 未安装，IntentClassifier 不可用")
+        print()
+        return
+
+    print("  [通过] IntentClassifier 导入成功")
+
+    # 测试模型不存在时的 FileNotFoundError
+    try:
+        clf = IntentClassifier(model_path="models/nonexistent_model")
+        assert False, "应当抛出 FileNotFoundError"
+    except FileNotFoundError:
+        print("  [通过] 模型路径不存在时正确抛出 FileNotFoundError")
+
+    print()
+
+
+def test_intent_classifier_inference():
+    """测试 IntentClassifier 推理（需要训练好的模型）"""
+    print("=" * 50)
+    print("测试 IntentClassifier 推理")
+    print("=" * 50)
+
+    if not _HAS_INTENT_CLASSIFIER:
+        print("  [跳过] torch/transformers 未安装")
+        print()
+        return
+
+    import os
+    model_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "models", "intent_classifier",
+    )
+    if not os.path.exists(model_path):
+        print(f"  [跳过] 模型未训练: {model_path}")
+        print("         请先运行 scripts/train_intent_classifier.py")
+        print()
+        return
+
+    # 加载模型（自动选 CPU/GPU）
+    clf = IntentClassifier(model_path=model_path)
+    print(f"  [通过] 模型加载成功 (device={clf.device})")
+    print(f"         标签: {clf.label_names}")
+
+    # 验证标签完整性
+    expected_labels = {"add_event", "query_event", "delete_event", "update_event", "other"}
+    assert set(clf.label_names) == expected_labels, (
+        f"标签不匹配: {set(clf.label_names)} vs {expected_labels}"
+    )
+    print(f"  [通过] 标签完整性验证")
+
+    # 单条推理测试
+    test_cases = [
+        ("帮我安排明天下午三点的团队会议", "add_event"),
+        ("今天有什么日程安排", "query_event"),
+        ("删掉明天的面试", "delete_event"),
+        ("把后天的会议改到大后天", "update_event"),
+        ("今天天气怎么样", "other"),
+    ]
+    for text, expected_intent in test_cases:
+        label, confidence = clf.predict(text)
+        status = "通过" if label == expected_intent else "警告"
+        print(f"  [{status}] '{text}' → {label} ({confidence:.3f}) [期望: {expected_intent}]")
+
+    # 批量推理测试
+    texts = [t for t, _ in test_cases]
+    results = clf.predict_batch(texts)
+    assert len(results) == len(texts), f"批量推理数量不匹配: {len(results)} vs {len(texts)}"
+    print(f"  [通过] 批量推理: {len(results)} 条")
+
+    # 置信度范围验证
+    for label, conf in results:
+        assert 0.0 <= conf <= 1.0, f"置信度越界: {conf}"
+        assert label in expected_labels, f"未知标签: {label}"
+    print(f"  [通过] 置信度范围验证")
+
+    print()
+
+
+def test_parser_with_intent_model():
+    """测试 CommandParser 集成意图分类模型"""
+    print("=" * 50)
+    print("测试 CommandParser + IntentClassifier 集成")
+    print("=" * 50)
+
+    # 1. 模型未启用时，正常工作（回退到规则引擎）
+    parser = CommandParser(llm_enabled=False, intent_model_enabled=False)
+    result = parser.parse("明天下午三点开会")
+    assert result.command_type == CommandType.ADD_EVENT
+    print(f"  [通过] 模型未启用: 规则引擎正常 → {result.command_type.value}")
+
+    # 2. 模型启用但路径不存在时，应回退到规则引擎
+    parser_fallback = CommandParser(
+        llm_enabled=False,
+        intent_model_enabled=True,
+        intent_model_path="models/nonexistent_model",
+    )
+    result = parser_fallback.parse("安排明天的团队会议")
+    assert result.command_type == CommandType.ADD_EVENT
+    print(f"  [通过] 模型路径不存在: 回退到规则引擎 → {result.command_type.value}")
+
+    # 3. 模型启用且存在时，测试完整流程
+    if not _HAS_INTENT_CLASSIFIER:
+        print("  [跳过] torch/transformers 未安装，无法测试模型集成")
+        print()
+        return
+
+    import os
+    model_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "models", "intent_classifier",
+    )
+    if not os.path.exists(model_path):
+        print(f"  [跳过] 模型未训练: {model_path}")
+        print()
+        return
+
+    parser_model = CommandParser(
+        llm_enabled=False,
+        intent_model_enabled=True,
+        intent_model_path=model_path,
+        intent_confidence_threshold=0.8,
+    )
+
+    # 测试日历相关指令（模型应识别）
+    model_cases = [
+        ("帮我安排明天下午三点的团队会议", CommandType.ADD_EVENT),
+        ("今天有什么安排", CommandType.QUERY_EVENT),
+        ("删掉后天的面试", CommandType.DELETE_EVENT),
+    ]
+    for text, expected_type in model_cases:
+        result = parser_model.parse(text)
+        status = "通过" if result.command_type == expected_type else "警告"
+        print(f"  [{status}] 模型集成: '{text}' → {result.command_type.value} "
+              f"(confidence={result.confidence:.3f}) [期望: {expected_type.value}]")
+
+    # 测试非日历指令（模型应识别为 UNKNOWN）
+    result = parser_model.parse("帮我订一张去北京的机票")
+    print(f"  [信息] 非日历指令: → {result.command_type.value} "
+          f"(confidence={result.confidence:.3f})")
+
+    print()
+
+
 if __name__ == "__main__":
     print("\n指令解析层功能验证\n")
     try:
@@ -271,6 +429,9 @@ if __name__ == "__main__":
         test_command_parser()
         test_fuzzy_correction()
         test_parse_multiple()
+        test_intent_classifier_import()
+        test_intent_classifier_inference()
+        test_parser_with_intent_model()
         print("=" * 50)
         print("全部测试通过!")
         print("=" * 50)

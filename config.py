@@ -34,6 +34,10 @@ class Config:
         "llm_provider": "ollama",  # ollama/openai
         "llm_model": "qwen2.5:7b",
         "llm_base_url": "http://localhost:11434",
+        # 意图分类模型设置（可选，替换关键词意图匹配）
+        "intent_model_enabled": False,
+        "intent_model_path": "models/intent_classifier",
+        "intent_confidence_threshold": 0.8,
         # UI 设置
         "theme": "system",  # system, light, dark
         "start_minimized": False,
