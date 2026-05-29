@@ -116,10 +116,43 @@ class CommandParser:
         r"(?:还有|以及|另外|然后|同时|再者|接着|其次|最后|再|[\uff0c\u3002])"
     )
 
+    # 时间边界分割正则（在时间关键词/数字时间前拆分）
+    _TIME_BOUNDARY_SPLIT = re.compile(
+        r"(?=(?:大后天|后天|明天|今天|今日|今晚|明晚|"
+        r"早上|早晨|上午|中午|下午|傍晚|晚上|晚间|凌晨|"
+        r"(?<!\d)\d{1,2}点))"
+    )
+
+    # 纯日期/时段词（用于合并无标题的时间片段）
+    _DATE_PERIOD_WORDS = {
+        "大后天", "后天", "明天", "今天", "今日", "今晚", "明晚",
+        "早上", "早晨", "上午", "中午", "下午", "傍晚", "晚上", "晚间", "凌晨",
+    }
+
+    def _split_by_time_boundaries(self, segment: str) -> list:
+        """按时间关键词边界进一步拆分片段
+
+        当 Whisper 输出无标点的多事件文本时，在时间关键词前拆分。
+        纯日期/时段片段（如单独的"明天"）会自动与下一片段合并。
+        """
+        parts = self._TIME_BOUNDARY_SPLIT.split(segment)
+        parts = [p.strip() for p in parts if p.strip()]
+        if len(parts) <= 1:
+            return parts
+        # 合并无标题的纯日期/时段片段到下一段（保持"明天下午"不拆分）
+        merged = [parts[0]]
+        for part in parts[1:]:
+            prev = merged[-1].strip()
+            if prev in self._DATE_PERIOD_WORDS:
+                merged[-1] = prev + part
+            else:
+                merged.append(part)
+        return merged
+
     def parse_multiple(self, text: str) -> List[ParsedCommand]:
         """解析可能包含多个指令的文本
 
-        按连接词分句后逐句解析，返回所有非 UNKNOWN 的指令。
+        分三层拆分：连接词/标点 → 时间边界 → 逐句解析。
 
         Args:
             text: 语音识别后的完整文本
@@ -127,18 +160,23 @@ class CommandParser:
         Returns:
             ParsedCommand 列表（仅包含可识别的指令）
         """
-        # 拆分文本
+        # 第一层：按连接词/标点拆分
         segments = self._SPLIT_DELIMITERS.split(text)
         segments = [s.strip() for s in segments if s.strip()]
 
+        # 第二层：对每个片段按时间边界进一步拆分
+        all_segments: List[str] = []
+        for segment in segments:
+            all_segments.extend(self._split_by_time_boundaries(segment))
+
         # 如果拆分后只有一段，直接走单次解析
-        if len(segments) <= 1:
+        if len(all_segments) <= 1:
             result = self.parse(text)
             return [result] if result.command_type != CommandType.UNKNOWN else []
 
-        # 逐段解析
+        # 第三层：逐段解析
         results: List[ParsedCommand] = []
-        for segment in segments:
+        for segment in all_segments:
             cmd = self.parse(segment)
             if cmd.command_type != CommandType.UNKNOWN:
                 results.append(cmd)

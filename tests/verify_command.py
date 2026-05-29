@@ -226,6 +226,30 @@ def test_parse_multiple():
     assert len(add_results) >= 2, f"期望至少 2 条，实际 {len(add_results)}"
     print(f"  [通过] '还有'分隔: {len(add_results)} 条指令")
 
+    # 时间边界拆分（无标点，核心修复场景）
+    results = parser.parse_multiple("上午8点起床中午12点吃饭")
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) >= 2, f"期望 2 条，实际 {len(add_results)}"
+    print(f"  [通过] 时间边界拆分(2事件): {len(add_results)} 条指令")
+    for r in add_results:
+        print(f"         - title='{r.title}', time={r.time.strftime('%m-%d %H:%M') if r.time else 'None'}")
+
+    # 日期+时段不拆分（"明天下午"应为同一事件）
+    results = parser.parse_multiple("明天下午三点开会后天上午十点面试")
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) >= 2, f"期望 2 条，实际 {len(add_results)}"
+    print(f"  [通过] 日期+时段不拆分(2事件): {len(add_results)} 条指令")
+    for r in add_results:
+        print(f"         - title='{r.title}', time={r.time.strftime('%m-%d %H:%M') if r.time else 'None'}")
+
+    # 三事件时间边界拆分
+    results = parser.parse_multiple("上午8点起床中午12点吃饭晚上8点看电影")
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) >= 3, f"期望 3 条，实际 {len(add_results)}"
+    print(f"  [通过] 时间边界拆分(3事件): {len(add_results)} 条指令")
+    for r in add_results:
+        print(f"         - title='{r.title}', time={r.time.strftime('%m-%d %H:%M') if r.time else 'None'}")
+
     # 单条指令正常返回
     results = parser.parse_multiple("明天下午三点开会")
     assert len(results) == 1
