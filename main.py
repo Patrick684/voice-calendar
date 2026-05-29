@@ -229,12 +229,22 @@ class VoiceCalendarApp:
             logger.info(f"识别结果: {text}")
             self._result_queue.put(("voice_result", text, None))
 
-            # 3. 指令解析
-            command = self._command_parser.parse(text)
-            logger.info(f"指令解析: type={command.command_type.value}, title='{command.title}'")
+            # 3. 指令解析（支持多指令拆分）
+            commands = self._command_parser.parse_multiple(text)
+            logger.info(f"指令解析: 识别到 {len(commands)} 条指令")
 
-            # 4. 执行指令
-            self._execute_command(command)
+            if not commands:
+                self._result_queue.put(
+                    ("voice_state", VoiceState.ERROR, "未识别到有效指令")
+                )
+                return
+
+            # 4. 逐条执行指令
+            for cmd in commands:
+                logger.info(
+                    f"执行指令: type={cmd.command_type.value}, title='{cmd.title}'"
+                )
+                self._execute_command(cmd)
 
         except Exception as e:
             logger.error(f"语音处理失败: {e}", exc_info=True)
@@ -302,7 +312,9 @@ class VoiceCalendarApp:
             command.title = command.original_text
         if not command.time:
             from datetime import datetime, timedelta
-            command.time = datetime.now() + timedelta(hours=1)
+            tomorrow = datetime.now().replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            command.time = tomorrow
+            logger.warning(f"未解析到时间，使用默认值: {command.time}")
 
         event = self._calendar.add_event(
             title=command.title,

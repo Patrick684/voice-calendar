@@ -167,12 +167,86 @@ def test_command_parser():
     print()
 
 
+def test_fuzzy_correction():
+    """测试时间关键词近音纠错"""
+    print("=" * 50)
+    print("测试 TimeParser 近音纠错")
+    print("=" * 50)
+
+    parser = TimeParser()
+
+    # “名天”应纠错为“明天”（同音异字）
+    result = parser._fuzzy_correct_time_keywords("名天下午三点开会")
+    assert "明天" in result, f"期望包含'明天'，实际: {result}"
+    print(f"  [通过] 近音纠错: '名天' -> '明天' => '{result}'")
+
+    # “后添”应纠错为“后天”（同音异字）
+    result = parser._fuzzy_correct_time_keywords("后添上午十点看牙")
+    assert "后天" in result, f"期望包含'后天'，实际: {result}"
+    print(f"  [通过] 近音纠错: '后添' -> '后天' => '{result}'")
+
+    # “今填”应纠错为“今天”（同音异字）
+    result = parser._fuzzy_correct_time_keywords("今填晚上八点吃药")
+    assert "今天" in result, f"期望包含'今天'，实际: {result}"
+    print(f"  [通过] 近音纠错: '今填' -> '今天' => '{result}'")
+
+    # 正确词不应被修改
+    result = parser._fuzzy_correct_time_keywords("明天下午三点开会")
+    assert result == "明天下午三点开会", f"正确词被误改: {result}"
+    print(f"  [通过] 正确词不被修改: '{result}'")
+
+    # 纠错后应能正常解析时间
+    parsed_time, remaining = parser.parse("名天下午三点开会")
+    assert parsed_time is not None, "纠错后应解析到时间"
+    assert parsed_time.hour == 15, f"期望 15 点，实际 {parsed_time.hour}"
+    print(f"  [通过] 纠错后解析: '{parsed_time.strftime('%m-%d %H:%M')}' | 剩余: '{remaining}'")
+
+    print()
+
+
+def test_parse_multiple():
+    """测试多指令拆分解析"""
+    print("=" * 50)
+    print("测试 CommandParser 多指令拆分")
+    print("=" * 50)
+
+    parser = CommandParser(llm_enabled=False)
+
+    # 逗号分隔多事件
+    results = parser.parse_multiple("明天下午三点开会，后天上午十点看牙")
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) >= 2, f"期望至少 2 条添加指令，实际 {len(add_results)}"
+    print(f"  [通过] 逗号分隔: {len(add_results)} 条指令")
+    for r in add_results:
+        print(f"         - type={r.command_type.value}, title='{r.title}', time={r.time.strftime('%m-%d %H:%M') if r.time else 'None'}")
+
+    # 连接词分隔
+    results = parser.parse_multiple("安排明天的团队会议还有后天的面试")
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) >= 2, f"期望至少 2 条，实际 {len(add_results)}"
+    print(f"  [通过] '还有'分隔: {len(add_results)} 条指令")
+
+    # 单条指令正常返回
+    results = parser.parse_multiple("明天下午三点开会")
+    assert len(results) == 1
+    print(f"  [通过] 单条指令: {len(results)} 条")
+
+    # 无法识别的文本返回空列表
+    results = parser.parse_multiple("你好世界")
+    assert len(results) == 0
+    print(f"  [通过] 无法识别: {len(results)} 条")
+
+    print()
+
+
 if __name__ == "__main__":
     print("\n指令解析层功能验证\n")
     try:
         test_time_parser()
         test_rule_engine()
         test_command_parser()
+        test_fuzzy_correction()
+        test_parse_multiple()
         print("=" * 50)
         print("全部测试通过!")
         print("=" * 50)

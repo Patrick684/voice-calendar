@@ -19,6 +19,19 @@ logger = logging.getLogger(__name__)
 class TimeParser:
     """中文时间表达式解析器"""
 
+    # 时间关键词及其拼音基准（用于近音纠错）
+    TIME_KEYWORD_PINYIN = {
+        "明天": ["ming", "tian"],
+        "后天": ["hou", "tian"],
+        "今天": ["jin", "tian"],
+        "大后天": ["da", "hou", "tian"],
+        "今晚": ["jin", "wan"],
+        "明晚": ["ming", "wan"],
+        "上午": ["shang", "wu"],
+        "下午": ["xia", "wu"],
+        "晚上": ["wan", "shang"],
+    }
+
     # 中文数字到阿拉伯数字映射
     CN_NUM = {
         "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
@@ -52,6 +65,9 @@ class TimeParser:
             (解析出的 datetime, 剩余文本)
             如果无法解析时间，datetime 为 None
         """
+        # 近音纠错预处理
+        text = self._fuzzy_correct_time_keywords(text)
+
         now = datetime.now()
         base_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
         result_time = None
@@ -282,6 +298,111 @@ class TimeParser:
                 return (hour, minute), remaining
 
         return None, text
+
+    @classmethod
+    def _fuzzy_correct_time_keywords(cls, text: str) -> str:
+        """对文本中的时间关键词进行近音纠错
+
+        使用拼音归一化 + 精确匹配策略，将 Whisper 可能误识别的近音词
+        纠正为正确的时间关键词。
+
+        归一化规则（处理常见中文发音混淆）：
+        - n/l 不分（南方口音）：nan -> lan
+        - 前鼻音/后鼻音不分：in -> ing
+        - 翘舌/平舌不分：sh -> s
+
+        例如：“明先” → “明天”，“后添” → “后天”
+
+        Args:
+            text: 待纠错的文本
+
+        Returns:
+            纠正后的文本
+        """
+        try:
+            from pypinyin import lazy_pinyin
+        except ImportError:
+            return text
+
+        # 按关键词长度降序排列，优先匹配长词（如“大后天”先于“后天”）
+        sorted_keywords = sorted(
+            cls.TIME_KEYWORD_PINYIN.items(),
+            key=lambda x: len(x[0]),
+            reverse=True,
+        )
+
+        corrected = text
+        for pos in range(len(corrected)):
+            for keyword, kw_pinyin in sorted_keywords:
+                klen = len(keyword)
+                if pos + klen > len(corrected):
+                    continue
+                candidate = corrected[pos:pos + klen]
+                # 如果已经是正确关键词，跳过
+                if candidate == keyword:
+                    break  # 当前位置已匹配，跳到下一个位置
+                # 如果候选词本身是另一个时间关键词，不替换
+                if candidate in cls.TIME_KEYWORD_PINYIN:
+                    break
+                # 获取候选词的拼音
+                try:
+                    cand_pinyin = lazy_pinyin(candidate)
+                except Exception:
+                    continue
+                # 归一化后精确匹配
+                norm_cand = [cls._normalize_pinyin(p) for p in cand_pinyin]
+                norm_kw = [cls._normalize_pinyin(p) for p in kw_pinyin]
+                if norm_cand == norm_kw:
+                    logger.info(f"近音纠错: '{candidate}' -> '{keyword}'")
+                    corrected = corrected[:pos] + keyword + corrected[pos + klen:]
+                    break  # 当前位置已纠正
+
+        return corrected
+
+    # 常见拼音混淆归一化规则（分两级，避免键冲突）
+    # 第一级：声母混淆（翘舌/平舌、n/l）
+    _PINYIN_INITIAL_NORM = {
+        # 翘舌/平舌不分
+        "shi": "si", "zhi": "zi", "chi": "ci",
+        "shang": "sang", "zhang": "zang", "chang": "cang",
+        "shu": "su", "zhu": "zu", "chu": "cu",
+        "shen": "sen", "zhen": "zen",
+        # n/l 不分
+        "nan": "lan", "niu": "liu", "nong": "long",
+        "nu": "lu", "nv": "lv", "nuan": "luan",
+        "ne": "le", "nai": "lai", "nao": "lao",
+        "nen": "len", "nang": "lang", "ning": "ling",
+    }
+    # 第二级：韵母混淆（前鼻音/后鼻音）
+    _PINYIN_FINAL_NORM = {
+        "yin": "ying", "jin": "jing", "xin": "xing",
+        "lin": "ling", "min": "ming", "bin": "bing",
+        "pin": "ping", "qin": "qing", "tin": "ting",
+        "nin": "ning", "zhen": "zheng", "chen": "cheng",
+        "shen": "sheng", "fen": "feng", "ben": "beng",
+        "pen": "peng", "men": "meng", "gen": "geng",
+        "ken": "keng", "hen": "heng", "wen": "weng",
+    }
+
+    @classmethod
+    def _normalize_pinyin(cls, pinyin: str) -> str:
+        """归一化拼音，消除常见发音混淆
+
+        依次应用声母归一化和韵母归一化，任一规则命中即返回。
+
+        Args:
+            pinyin: 原始拼音
+
+        Returns:
+            归一化后的拼音
+        """
+        # 优先应用声母规则
+        if pinyin in cls._PINYIN_INITIAL_NORM:
+            return cls._PINYIN_INITIAL_NORM[pinyin]
+        # 再应用韵母规则
+        if pinyin in cls._PINYIN_FINAL_NORM:
+            return cls._PINYIN_FINAL_NORM[pinyin]
+        return pinyin
 
     @classmethod
     def _cn_to_int(cls, text: str) -> int:

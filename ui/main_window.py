@@ -55,6 +55,9 @@ class MainWindow(ctk.CTk):
         # 事件标记日期缓存
         self._event_dates: List[str] = []
 
+        # 按钮录音即时状态标记（避免轮询延迟导致竞态）
+        self._is_recording = False
+
         self._setup_window()
         self._setup_ui()
         self._refresh_calendar()
@@ -234,13 +237,15 @@ class MainWindow(ctk.CTk):
         is_today, is_selected, has_event,
     ):
         """创建单个日期格子"""
-        bg_color = "#2b2b2b"  # 深灰底色，确保白色文字可读
-        text_color = "white"
+        bg_color = "#f0f0f0"  # 浅灰底
+        text_color = "#333333"  # 深灰/黑色字
 
         if is_selected:
             bg_color = "#3498db"
+            text_color = "white"
         elif is_today:
             bg_color = "#2ecc71"
+            text_color = "white"
 
         cell = ctk.CTkButton(
             self._days_frame,
@@ -392,13 +397,13 @@ class MainWindow(ctk.CTk):
         )
 
     def _on_voice_click(self):
-        """语音按钮点击 - 切换录音/停止"""
-        if self._voice_panel._state == VoiceState.RECORDING:
-            # 录音中 → 停止
+        """语音按钮点击 - 切换录音/停止（使用即时标记避免轮询竞态）"""
+        if self._is_recording:
+            self._is_recording = False
             if self._on_voice_stop:
                 self._on_voice_stop()
         else:
-            # 空闲/完成/错误 → 开始录音
+            self._is_recording = True
             if self._on_voice_start:
                 self._on_voice_start()
 
@@ -412,7 +417,11 @@ class MainWindow(ctk.CTk):
     # ================================================================
 
     def set_voice_state(self, state: VoiceState, message: str = ""):
-        """更新语音面板状态"""
+        """更新语音面板状态，同步录音标记"""
+        if state == VoiceState.RECORDING:
+            self._is_recording = True
+        elif state in (VoiceState.IDLE, VoiceState.SUCCESS, VoiceState.ERROR):
+            self._is_recording = False
         self._voice_panel.set_state(state, message)
 
     def show_voice_result(self, text: str):

@@ -87,7 +87,7 @@ class RuleEngine:
     ]
 
     # 标题首部噪音词（包含助词）
-    TITLE_LEAD_NOISE = ["的", "了", "吧", "呢", "啊", "一个", "一条"]
+    TITLE_LEAD_NOISE = ["的", "了", "吧", "呢", "啊", "一个", "一条", "我"]
 
     def __init__(self):
         self._time_parser = TimeParser()

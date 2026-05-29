@@ -7,7 +7,8 @@
 """
 
 import logging
-from typing import Optional
+import re
+from typing import Optional, List
 
 from command.rule_engine import RuleEngine, CommandType, ParsedCommand
 from command.llm_fallback import LLMFallback
@@ -109,3 +110,42 @@ class CommandParser:
     def enable_llm(self, enabled: bool):
         """动态开关 LLM 兜底"""
         self._llm_enabled = enabled
+
+    # 多指令拆分连接词（按长度降序，长词优先匹配）
+    _SPLIT_DELIMITERS = re.compile(
+        r"(?:还有|以及|另外|然后|同时|再者|接着|其次|最后|再|[\uff0c\u3002])"
+    )
+
+    def parse_multiple(self, text: str) -> List[ParsedCommand]:
+        """解析可能包含多个指令的文本
+
+        按连接词分句后逐句解析，返回所有非 UNKNOWN 的指令。
+
+        Args:
+            text: 语音识别后的完整文本
+
+        Returns:
+            ParsedCommand 列表（仅包含可识别的指令）
+        """
+        # 拆分文本
+        segments = self._SPLIT_DELIMITERS.split(text)
+        segments = [s.strip() for s in segments if s.strip()]
+
+        # 如果拆分后只有一段，直接走单次解析
+        if len(segments) <= 1:
+            result = self.parse(text)
+            return [result] if result.command_type != CommandType.UNKNOWN else []
+
+        # 逐段解析
+        results: List[ParsedCommand] = []
+        for segment in segments:
+            cmd = self.parse(segment)
+            if cmd.command_type != CommandType.UNKNOWN:
+                results.append(cmd)
+                logger.info(
+                    f"多指令解析: '{segment}' -> {cmd.command_type.value}"
+                )
+            else:
+                logger.debug(f"多指令解析: 忽略无法识别的片段 '{segment}'")
+
+        return results
