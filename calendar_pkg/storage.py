@@ -87,7 +87,7 @@ class SQLiteStorage:
 
         if current_version < 2:
             self._migrate_v1_to_v2(conn)
-            logger.info("Schema 迁移完成: v1 -> v2 (+priority)")
+            logger.info("Schema 迁移完成: v1 -> v2 (+priority, +category)")
 
         # 更新版本号
         conn.execute(
@@ -97,13 +97,12 @@ class SQLiteStorage:
 
     @staticmethod
     def _migrate_v1_to_v2(conn: sqlite3.Connection):
-        """v1 → v2: 新增 priority 列"""
-        try:
-            conn.execute(
-                "ALTER TABLE events ADD COLUMN priority INTEGER DEFAULT 0"
-            )
-        except sqlite3.OperationalError:
-            pass  # 列已存在
+        """v1 → v2: 新增 priority 和 category 列"""
+        for col, default in [("priority", "INTEGER DEFAULT 0"), ("category", "TEXT DEFAULT ''")]:
+            try:
+                conn.execute(f"ALTER TABLE events ADD COLUMN {col} {default}")
+            except sqlite3.OperationalError:
+                pass  # 列已存在
 
     def insert_event(self, event: CalendarEvent) -> int:
         """插入新事件
@@ -123,8 +122,9 @@ class SQLiteStorage:
             cursor = conn.execute(
                 """INSERT INTO events
                    (title, start_time, end_time, description, is_all_day,
-                    reminder_minutes, priority, tags, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    reminder_minutes, priority, category, tags,
+                    created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     data["title"],
                     data["start_time"],
@@ -133,6 +133,7 @@ class SQLiteStorage:
                     int(data.get("is_all_day", False)),
                     data.get("reminder_minutes"),
                     data.get("priority", 0),
+                    data.get("category", ""),
                     data.get("tags", ""),
                     data.get("created_at"),
                     data.get("updated_at"),

@@ -18,6 +18,7 @@ class CalendarEvent:
         is_all_day: 是否全天事件
         reminder_minutes: 提前提醒分钟数（None 表示不提醒）
         priority: 优先级（0=普通, 1=重要, 2=紧急, 3=紧急且重要）
+        category: 事件分类（工作/健康/学习/生活/娱乐/其他）
         tags: 事件标签列表
         created_at: 创建时间
         updated_at: 最后更新时间
@@ -40,6 +41,7 @@ class CalendarEvent:
     is_all_day: bool = False
     reminder_minutes: Optional[int] = 15
     priority: int = 0
+    category: str = ""
     tags: List[str] = field(default_factory=list)
     id: Optional[int] = None
     created_at: Optional[str] = None
@@ -98,6 +100,7 @@ class CalendarEvent:
             is_all_day=bool(row.get("is_all_day", 0)),
             reminder_minutes=row.get("reminder_minutes"),
             priority=row.get("priority", 0) or 0,
+            category=row.get("category", "") or "",
             tags=tags,
             created_at=row.get("created_at"),
             updated_at=row.get("updated_at"),

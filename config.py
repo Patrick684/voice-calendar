@@ -49,6 +49,16 @@ class Config:
         # 后处理设置
         "text_correction": True,  # 中文同音字纠错
         "punctuation_optimization": True,
+        # 事件分类颜色映射
+        "category_colors": {
+            "工作": "#2196F3",
+            "健康": "#4CAF50",
+            "学习": "#FF9800",
+            "生活": "#9C27B0",
+            "娱乐": "#E91E63",
+            "社交": "#00BCD4",
+            "其他": "#757575",
+        },
         # 历史记录设置
         "history_enabled": True,
         "history_max_records": 500,

@@ -466,6 +466,109 @@ def test_priority_detection():
     print()
 
 
+def test_event_classification():
+    """测试事件自动分类"""
+    print("=" * 50)
+    print("测试事件自动分类")
+    print("=" * 50)
+
+    from calendar_pkg.classifier import EventClassifier
+
+    classifier = EventClassifier()
+
+    # 工作类
+    result = classifier.classify("明天下午三点开会")
+    assert result == "工作", f"期望'工作'，实际: {result}"
+    print(f"  [通过] '明天下午三点开会' -> {result}")
+
+    # 健康类
+    result = classifier.classify("早上去跑步")
+    assert result == "健康", f"期望'健康'，实际: {result}"
+    print(f"  [通过] '早上去跑步' -> {result}")
+
+    # 学习类
+    result = classifier.classify("晚上读书两小时")
+    assert result == "学习", f"期望'学习'，实际: {result}"
+    print(f"  [通过] '晚上读书两小时' -> {result}")
+
+    # 生活类
+    result = classifier.classify("去超市买菜")
+    assert result == "生活", f"期望'生活'，实际: {result}"
+    print(f"  [通过] '去超市买菜' -> {result}")
+
+    # 娱乐类
+    result = classifier.classify("周末看电影")
+    assert result == "娱乐", f"期望'娱乐'，实际: {result}"
+    print(f"  [通过] '周末看电影' -> {result}")
+
+    # 社交类
+    result = classifier.classify("参加小明的婚礼")
+    assert result == "社交", f"期望'社交'，实际: {result}"
+    print(f"  [通过] '参加小明的婚礼' -> {result}")
+
+    # 其他类
+    result = classifier.classify("随便逛逛")
+    assert result == "其他", f"期望'其他'，实际: {result}"
+    print(f"  [通过] '随便逛逛' -> {result}")
+
+    # 空标题
+    result = classifier.classify("")
+    assert result == "其他", f"空标题期望'其他'，实际: {result}"
+    print(f"  [通过] 空标题 -> {result}")
+
+    # 自定义关键词
+    custom = EventClassifier(custom_keywords={"工作": ["写代码", "调试"]})
+    result = custom.classify("下午写代码")
+    assert result == "工作", f"自定义期望'工作'，实际: {result}"
+    print(f"  [通过] 自定义关键词: '下午写代码' -> {result}")
+
+    # 类别列表
+    categories = classifier.categories
+    assert "工作" in categories and "其他" in categories
+    print(f"  [通过] 类别列表: {categories}")
+
+    print()
+
+
+def test_category_storage_roundtrip():
+    """测试 category 字段存储读写"""
+    print("=" * 50)
+    print("测试 category 存储读写")
+    print("=" * 50)
+
+    import tempfile
+    from calendar_pkg.manager import CalendarManager
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        mgr = CalendarManager(db_path=db_path)
+
+        # 添加事件（自动分类）
+        event = mgr.add_event(
+            title="下午三点开会讨论项目",
+            start_time=datetime.now() + timedelta(days=1),
+        )
+        assert event.category == "工作", f"自动分类期望'工作'，实际: {event.category}"
+        print(f"  [通过] 自动分类: '{event.title}' -> {event.category}")
+
+        # 手动指定分类
+        event2 = mgr.add_event(
+            title="晚上看电影",
+            start_time=datetime.now() + timedelta(days=1),
+            category="娱乐",
+        )
+        assert event2.category == "娱乐", f"手动分类期望'娱乐'，实际: {event2.category}"
+        print(f"  [通过] 手动分类: '{event2.title}' -> {event2.category}")
+
+        # 读取验证
+        loaded = mgr.get_event(event.id)
+        assert loaded is not None
+        assert loaded.category == "工作", f"读取分类期望'工作'，实际: {loaded.category}"
+        print(f"  [通过] 存储读取: category={loaded.category}")
+
+    print()
+
+
 def test_intent_classifier_import():
     """测试 IntentClassifier 导入和基本接口"""
     print("=" * 50)
@@ -627,6 +730,8 @@ if __name__ == "__main__":
         test_parse_multiple_real_world()
         test_date_context_inheritance()
         test_priority_detection()
+        test_event_classification()
+        test_category_storage_roundtrip()
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()

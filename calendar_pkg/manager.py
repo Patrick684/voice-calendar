@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from calendar_pkg.event import CalendarEvent
 from calendar_pkg.storage import SQLiteStorage
+from calendar_pkg.classifier import EventClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class CalendarManager:
         """
         self._storage = SQLiteStorage(db_path)
         self._default_reminder_minutes = default_reminder_minutes
+        self._classifier = EventClassifier()
         logger.info(f"日历管理器已初始化，数据库: {db_path}")
 
     # ================================================================
@@ -43,6 +45,7 @@ class CalendarManager:
         reminder_minutes: Optional[int] = None,
         tags: Optional[List[str]] = None,
         priority: int = 0,
+        category: str = "",
     ) -> CalendarEvent:
         """添加新事件
 
@@ -55,12 +58,17 @@ class CalendarManager:
             reminder_minutes: 提醒分钟数（None 使用默认值）
             tags: 标签列表
             priority: 优先级（0=普通, 1=重要, 2=紧急, 3=紧急且重要）
+            category: 事件分类（空字符串时自动分类）
 
         Returns:
             创建的事件对象（含 ID）
         """
         if reminder_minutes is None:
             reminder_minutes = self._default_reminder_minutes
+
+        # 未指定分类时自动分类
+        if not category:
+            category = self._classifier.classify(title)
 
         event = CalendarEvent(
             title=title,
@@ -71,6 +79,7 @@ class CalendarManager:
             reminder_minutes=reminder_minutes,
             tags=tags or [],
             priority=priority,
+            category=category,
         )
         event_id = self._storage.insert_event(event)
         event.id = event_id
