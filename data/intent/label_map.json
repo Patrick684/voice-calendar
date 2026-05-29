@@ -1,0 +1,7 @@
+{
+  "add_event": 0,
+  "query_event": 1,
+  "delete_event": 2,
+  "update_event": 3,
+  "other": 4
+}
