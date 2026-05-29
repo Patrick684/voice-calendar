@@ -216,6 +216,7 @@ class CommandParser:
             time=rule_result.time,
             end_time=rule_result.end_time,
             priority=rule_result.priority,
+            recurrence_rule=rule_result.recurrence_rule,
             original_text=text,
             confidence=confidence,
         )

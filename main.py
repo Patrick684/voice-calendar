@@ -320,6 +320,7 @@ class VoiceCalendarApp:
             title=command.title,
             start_time=command.time,
             priority=getattr(command, 'priority', 0),
+            recurrence_rule=getattr(command, 'recurrence_rule', ''),
         )
         time_str = command.time.strftime("%m月%d日 %H:%M")
         msg = f"已添加: {command.title} ({time_str})"

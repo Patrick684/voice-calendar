@@ -18,7 +18,7 @@ class SQLiteStorage:
     """
 
     # 数据库表结构版本（用于未来迁移）
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
 
     def __init__(self, db_path: str):
         """
@@ -89,6 +89,10 @@ class SQLiteStorage:
             self._migrate_v1_to_v2(conn)
             logger.info("Schema 迁移完成: v1 -> v2 (+priority, +category)")
 
+        if current_version < 3:
+            self._migrate_v2_to_v3(conn)
+            logger.info("Schema 迁移完成: v2 -> v3 (+recurrence_rule, +recurrence_end)")
+
         # 更新版本号
         conn.execute(
             "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
@@ -99,6 +103,15 @@ class SQLiteStorage:
     def _migrate_v1_to_v2(conn: sqlite3.Connection):
         """v1 → v2: 新增 priority 和 category 列"""
         for col, default in [("priority", "INTEGER DEFAULT 0"), ("category", "TEXT DEFAULT ''")]:
+            try:
+                conn.execute(f"ALTER TABLE events ADD COLUMN {col} {default}")
+            except sqlite3.OperationalError:
+                pass  # 列已存在
+
+    @staticmethod
+    def _migrate_v2_to_v3(conn: sqlite3.Connection):
+        """v2 → v3: 新增 recurrence_rule 和 recurrence_end 列"""
+        for col, default in [("recurrence_rule", "TEXT DEFAULT ''"), ("recurrence_end", "TEXT")]:
             try:
                 conn.execute(f"ALTER TABLE events ADD COLUMN {col} {default}")
             except sqlite3.OperationalError:
@@ -122,9 +135,10 @@ class SQLiteStorage:
             cursor = conn.execute(
                 """INSERT INTO events
                    (title, start_time, end_time, description, is_all_day,
-                    reminder_minutes, priority, category, tags,
+                    reminder_minutes, priority, category,
+                    recurrence_rule, recurrence_end, tags,
                     created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     data["title"],
                     data["start_time"],
@@ -134,6 +148,8 @@ class SQLiteStorage:
                     data.get("reminder_minutes"),
                     data.get("priority", 0),
                     data.get("category", ""),
+                    data.get("recurrence_rule", ""),
+                    data.get("recurrence_end"),
                     data.get("tags", ""),
                     data.get("created_at"),
                     data.get("updated_at"),
@@ -347,6 +363,20 @@ class SQLiteStorage:
         try:
             cursor = conn.execute("SELECT COUNT(*) as cnt FROM events")
             return cursor.fetchone()["cnt"]
+        finally:
+            conn.close()
+
+    def get_recurring_events(self) -> List[CalendarEvent]:
+        """获取所有循环事件"""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                """SELECT * FROM events
+                   WHERE recurrence_rule IS NOT NULL
+                     AND recurrence_rule != ''
+                   ORDER BY start_time ASC"""
+            )
+            return [CalendarEvent.from_row(dict(row)) for row in cursor.fetchall()]
         finally:
             conn.close()
 

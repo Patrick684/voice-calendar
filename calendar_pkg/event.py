@@ -19,6 +19,8 @@ class CalendarEvent:
         reminder_minutes: 提前提醒分钟数（None 表示不提醒）
         priority: 优先级（0=普通, 1=重要, 2=紧急, 3=紧急且重要）
         category: 事件分类（工作/健康/学习/生活/娱乐/其他）
+        recurrence_rule: 循环规则（iCal RRULE 格式）
+        recurrence_end: 循环结束时间（None 表示无限循环）
         tags: 事件标签列表
         created_at: 创建时间
         updated_at: 最后更新时间
@@ -42,6 +44,8 @@ class CalendarEvent:
     reminder_minutes: Optional[int] = 15
     priority: int = 0
     category: str = ""
+    recurrence_rule: str = ""
+    recurrence_end: Optional[datetime] = None
     tags: List[str] = field(default_factory=list)
     id: Optional[int] = None
     created_at: Optional[str] = None
@@ -65,7 +69,7 @@ class CalendarEvent:
         """序列化为字典（用于 JSON/数据库存储）"""
         data = asdict(self)
         # datetime 转为 ISO 字符串
-        for key in ("start_time", "end_time"):
+        for key in ("start_time", "end_time", "recurrence_end"):
             if isinstance(data.get(key), datetime):
                 data[key] = data[key].isoformat(timespec="seconds")
         # tags 列表转为逗号分隔字符串（SQLite 存储）
@@ -101,6 +105,8 @@ class CalendarEvent:
             reminder_minutes=row.get("reminder_minutes"),
             priority=row.get("priority", 0) or 0,
             category=row.get("category", "") or "",
+            recurrence_rule=row.get("recurrence_rule", "") or "",
+            recurrence_end=cls._parse_datetime(row.get("recurrence_end")),
             tags=tags,
             created_at=row.get("created_at"),
             updated_at=row.get("updated_at"),
@@ -134,6 +140,11 @@ class CalendarEvent:
     def priority_label(self) -> str:
         """优先级的中文标签"""
         return self.PRIORITY_LABELS.get(self.priority, "普通")
+
+    @property
+    def is_recurring(self) -> bool:
+        """是否为循环事件"""
+        return bool(self.recurrence_rule)
 
     def __repr__(self) -> str:
         time_str = self.start_time.strftime("%Y-%m-%d %H:%M")

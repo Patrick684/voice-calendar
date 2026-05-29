@@ -530,6 +530,110 @@ def test_event_classification():
     print()
 
 
+def test_recurrence_detection():
+    """测试循环事件触发词识别与 RRULE 解析"""
+    print("=" * 50)
+    print("测试循环事件检测")
+    print("=" * 50)
+
+    engine = RuleEngine()
+
+    # 每天
+    result = engine.parse("安排每天早上八点跑步")
+    assert result.recurrence_rule == "FREQ=DAILY", f"期望 FREQ=DAILY，实际: {result.recurrence_rule}"
+    print(f"  [通过] 每天: '{result.recurrence_rule}'")
+
+    # 每周
+    result = engine.parse("安排每周下午三点开会")
+    assert result.recurrence_rule == "FREQ=WEEKLY", f"期望 FREQ=WEEKLY，实际: {result.recurrence_rule}"
+    print(f"  [通过] 每周: '{result.recurrence_rule}'")
+
+    # 每周X
+    result = engine.parse("安排每周一上午十点汇报")
+    assert result.recurrence_rule == "FREQ=WEEKLY;BYDAY=MO", \
+        f"期望 FREQ=WEEKLY;BYDAY=MO，实际: {result.recurrence_rule}"
+    print(f"  [通过] 每周一: '{result.recurrence_rule}'")
+
+    # 每个星期X
+    result = engine.parse("安排每个星期五下午两点开会")
+    assert result.recurrence_rule == "FREQ=WEEKLY;BYDAY=FR", \
+        f"期望 FREQ=WEEKLY;BYDAY=FR，实际: {result.recurrence_rule}"
+    print(f"  [通过] 每个星期五: '{result.recurrence_rule}'")
+
+    # 每月
+    result = engine.parse("安排每月下午三点复盘")
+    assert result.recurrence_rule == "FREQ=MONTHLY", f"期望 FREQ=MONTHLY，实际: {result.recurrence_rule}"
+    print(f"  [通过] 每月: '{result.recurrence_rule}'")
+
+    # 工作日
+    result = engine.parse("安排工作日早上九点打卡")
+    assert "BYDAY=MO,TU,WE,TH,FR" in result.recurrence_rule, \
+        f"期望含 BYDAY=MO,TU,WE,TH,FR，实际: {result.recurrence_rule}"
+    print(f"  [通过] 工作日: '{result.recurrence_rule}'")
+
+    # 非循环事件不应有 recurrence_rule
+    result = engine.parse("安排明天下午三点开会")
+    assert result.recurrence_rule == "", f"非循环期望空，实际: {result.recurrence_rule}"
+    print(f"  [通过] 非循环: recurrence_rule='{result.recurrence_rule}'")
+
+    print()
+
+
+def test_recurrence_expansion():
+    """测试循环事件展开查询"""
+    print("=" * 50)
+    print("测试循环事件展开")
+    print("=" * 50)
+
+    import tempfile
+    from calendar_pkg.manager import CalendarManager
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        mgr = CalendarManager(db_path=db_path)
+
+        # 创建每天事件，起始为今天 08:00
+        today = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+        event = mgr.add_event(
+            title="每日跑步",
+            start_time=today,
+            recurrence_rule="FREQ=DAILY",
+        )
+        assert event.recurrence_rule == "FREQ=DAILY"
+        assert event.is_recurring
+        print(f"  [通过] 创建循环事件: {event.title}, rule={event.recurrence_rule}")
+
+        # 查询未来 7 天，应展开为 6 个虚拟实例（排除原始事件本身）
+        range_start = today.replace(hour=0, minute=0, second=0, microsecond=0)
+        range_end = range_start + timedelta(days=7)
+        events = mgr.get_events_by_range(range_start, range_end)
+        daily_events = [e for e in events if e.title == "每日跑步"]
+        # 原始事件 + 6 个展开实例 = 7
+        assert len(daily_events) == 7, f"期望 7 条，实际 {len(daily_events)}"
+        print(f"  [通过] 7 天展开: {len(daily_events)} 条（含原始）")
+
+        # 每周事件展开
+        weekly_start = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
+        # 找到下一个周一
+        days_until_monday = (7 - weekly_start.weekday()) % 7
+        if days_until_monday == 0:
+            days_until_monday = 7
+        next_monday = weekly_start + timedelta(days=days_until_monday)
+        mgr.add_event(
+            title="每周会议",
+            start_time=next_monday,
+            recurrence_rule="FREQ=WEEKLY",
+        )
+        range_end_4w = next_monday + timedelta(days=27)
+        events = mgr.get_events_by_range(next_monday, range_end_4w)
+        weekly_events = [e for e in events if e.title == "每周会议"]
+        # 27 天内应有 4 个周一实例（含原始）
+        assert len(weekly_events) == 4, f"4 周每周事件期望 4 条，实际 {len(weekly_events)}"
+        print(f"  [通过] 4 周每周展开: {len(weekly_events)} 条")
+
+    print()
+
+
 def test_category_storage_roundtrip():
     """测试 category 字段存储读写"""
     print("=" * 50)
@@ -732,6 +836,8 @@ if __name__ == "__main__":
         test_priority_detection()
         test_event_classification()
         test_category_storage_roundtrip()
+        test_recurrence_detection()
+        test_recurrence_expansion()
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()

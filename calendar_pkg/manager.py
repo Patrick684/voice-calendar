@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from dateutil.rrule import rrulestr
+
 from calendar_pkg.event import CalendarEvent
 from calendar_pkg.storage import SQLiteStorage
 from calendar_pkg.classifier import EventClassifier
@@ -46,6 +48,8 @@ class CalendarManager:
         tags: Optional[List[str]] = None,
         priority: int = 0,
         category: str = "",
+        recurrence_rule: str = "",
+        recurrence_end=None,
     ) -> CalendarEvent:
         """添加新事件
 
@@ -59,6 +63,8 @@ class CalendarManager:
             tags: 标签列表
             priority: 优先级（0=普通, 1=重要, 2=紧急, 3=紧急且重要）
             category: 事件分类（空字符串时自动分类）
+            recurrence_rule: 循环规则（iCal RRULE 格式）
+            recurrence_end: 循环结束时间
 
         Returns:
             创建的事件对象（含 ID）
@@ -80,6 +86,8 @@ class CalendarManager:
             tags=tags or [],
             priority=priority,
             category=category,
+            recurrence_rule=recurrence_rule,
+            recurrence_end=recurrence_end,
         )
         event_id = self._storage.insert_event(event)
         event.id = event_id
@@ -145,8 +153,19 @@ class CalendarManager:
     def get_events_by_range(
         self, start: datetime, end: datetime
     ) -> List[CalendarEvent]:
-        """查询时间范围内的事件"""
-        return self._storage.get_events_by_range(start, end)
+        """查询时间范围内的事件（含循环事件展开）"""
+        # 普通事件
+        events = self._storage.get_events_by_range(start, end)
+
+        # 循环事件展开
+        recurring = self._storage.get_recurring_events()
+        for rec_event in recurring:
+            instances = self._expand_recurring(rec_event, start, end)
+            events.extend(instances)
+
+        # 按开始时间排序
+        events.sort(key=lambda e: e.start_time)
+        return events
 
     def get_today_events(self) -> List[CalendarEvent]:
         """获取今天的事件"""
@@ -176,6 +195,61 @@ class CalendarManager:
     def get_event_count(self) -> int:
         """获取事件总数"""
         return self._storage.get_event_count()
+
+    # ================================================================
+    # 循环事件展开
+    # ================================================================
+
+    @staticmethod
+    def _expand_recurring(
+        event: CalendarEvent, range_start: datetime, range_end: datetime
+    ) -> List[CalendarEvent]:
+        """将循环事件展开为指定范围内的具体实例
+
+        Args:
+            event: 循环事件
+            range_start: 范围起始
+            range_end: 范围结束
+
+        Returns:
+            展开后的事件实例列表（id 为 None，表示虚拟实例）
+        """
+        if not event.recurrence_rule:
+            return []
+
+        instances = []
+        try:
+            # 构建 RRULE 字符串
+            rrule_string = f"DTSTART:{event.start_time.strftime('%Y%m%dT%H%M%S')}\nRRULE:{event.recurrence_rule}"
+            if event.recurrence_end:
+                rrule_string += f";UNTIL={event.recurrence_end.strftime('%Y%m%dT%H%M%S')}"
+
+            rule = rrulestr(rrule_string)
+
+            # 计算事件时长
+            duration = timedelta(minutes=event.duration_minutes) if event.duration_minutes else timedelta(0)
+
+            # 在范围内查找实例
+            for dt in rule.between(range_start, range_end, inc=True):
+                # 跳过原始事件本身（已在普通事件查询中返回）
+                if dt == event.start_time:
+                    continue
+                instance = CalendarEvent(
+                    title=event.title,
+                    start_time=dt,
+                    end_time=dt + duration if duration else None,
+                    description=event.description,
+                    is_all_day=event.is_all_day,
+                    reminder_minutes=event.reminder_minutes,
+                    priority=event.priority,
+                    category=event.category,
+                    tags=list(event.tags),
+                )
+                instances.append(instance)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"循环事件展开失败: {event.title}, rule={event.recurrence_rule}, error={e}")
+
+        return instances
 
     # ================================================================
     # 提醒相关

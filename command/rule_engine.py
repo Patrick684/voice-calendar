@@ -39,6 +39,7 @@ class ParsedCommand:
     time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     priority: int = 0
+    recurrence_rule: str = ""
     original_text: str = ""
     confidence: float = 0.0
 
@@ -93,11 +94,32 @@ class RuleEngine:
     TITLE_LEAD_NOISE = ["的", "了", "吧", "呢", "啊", "一个", "一条", "我"]
 
     # 优先级关键词（按优先级降序排列）
-    PRIORITY_CRITICAL_WORDS = ["紧急且重要", "既紧急又重要"]
+    PRIORITY_CRITICAL_WORDS = ["\u7d27\u6025\u4e14\u91cd\u8981", "\u65e2\u7d27\u6025\u53c8\u91cd\u8981"]
     PRIORITY_URGENT_WORDS = [
-        "紧急", "必须", "截止", "deadline", "马上", "立刻", "尽快",
+        "\u7d27\u6025", "\u5fc5\u987b", "\u622a\u6b62", "deadline", "\u9a6c\u4e0a", "\u7acb\u523b", "\u5c3d\u5feb",
     ]
-    PRIORITY_IMPORTANT_WORDS = ["重要", "务必", "一定", "不能忘"]
+    PRIORITY_IMPORTANT_WORDS = ["\u91cd\u8981", "\u52a1\u5fc5", "\u4e00\u5b9a", "\u4e0d\u80fd\u5fd8"]
+    
+    # 循环事件关键词 → RRULE 映射
+    # 格式: (关键词, FREQ, 附加参数)
+    RECURRENCE_PATTERNS = [
+        # 长词优先（避免子串冲突）
+        ("每个工作日", "WEEKLY", "BYDAY=MO,TU,WE,TH,FR"),
+        ("每个星期", "WEEKLY", ""),
+        ("每周", "WEEKLY", ""),
+        ("每个月", "MONTHLY", ""),
+        ("每月", "MONTHLY", ""),
+        ("每年", "YEARLY", ""),
+        ("每天", "DAILY", ""),
+        ("每日", "DAILY", ""),
+        ("工作日", "WEEKLY", "BYDAY=MO,TU,WE,TH,FR"),
+    ]
+    
+    # 星期映射
+    WEEKDAY_MAP = {
+        "一": "MO", "二": "TU", "三": "WE", "四": "TH",
+        "五": "FR", "六": "SA", "日": "SU", "天": "SU",
+    }
 
     def __init__(self):
         self._time_parser = TimeParser()
@@ -184,6 +206,14 @@ class RuleEngine:
         # 检测优先级
         priority = self._detect_priority(text)
 
+        # 检测循环规则
+        recurrence_rule, text_without_recurrence = self._detect_recurrence(
+            text_without_keyword
+        )
+        # 如果从去关键词文本中未检测到，尝试从原始文本检测
+        if not recurrence_rule:
+            recurrence_rule, _ = self._detect_recurrence(text)
+
         # 清理标题
         title = self._clean_title(remaining)
 
@@ -206,6 +236,7 @@ class RuleEngine:
             title=title,
             time=parsed_time,
             priority=priority,
+            recurrence_rule=recurrence_rule,
             original_text=text,
             confidence=0.8,
         )
@@ -233,6 +264,7 @@ class RuleEngine:
                     title=title,
                     time=parsed_time,
                     priority=self._detect_priority(text),
+                    recurrence_rule=self._detect_recurrence(text)[0],
                     original_text=text,
                     confidence=0.6,  # 隐式指令置信度较低
                 )
@@ -262,6 +294,51 @@ class RuleEngine:
             if word in text_lower:
                 return 1
         return 0
+
+    @classmethod
+    def _detect_recurrence(cls, text: str) -> tuple:
+        """从文本中检测循环规则
+
+        支持的模式:
+        - 每天/每日 → FREQ=DAILY
+        - 每周/每个星期 → FREQ=WEEKLY
+        - 每周X/每个星期X → FREQ=WEEKLY;BYDAY=XX
+        - 每月/每个月 → FREQ=MONTHLY
+        - 每年 → FREQ=YEARLY
+        - 工作日/每个工作日 → FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR
+
+        Args:
+            text: 输入文本
+
+        Returns:
+            (recurrence_rule, cleaned_text) 元组
+        """
+        if not text:
+            return "", text
+
+        # 尝试匹配 “每周X” / “每个星期X” (带星期后缀)
+        weekday_pattern = re.compile(
+            r"(?:每周|每个星期)([一二三四五六日天])"
+        )
+        m = weekday_pattern.search(text)
+        if m:
+            day_char = m.group(1)
+            day_code = cls.WEEKDAY_MAP.get(day_char, "")
+            if day_code:
+                rule = f"FREQ=WEEKLY;BYDAY={day_code}"
+                cleaned = text[:m.start()] + text[m.end():]
+                return rule, cleaned.strip()
+
+        # 尝试匹配固定模式列表
+        for keyword, freq, extra in cls.RECURRENCE_PATTERNS:
+            if keyword in text:
+                rule = f"FREQ={freq}"
+                if extra:
+                    rule += f";{extra}"
+                cleaned = text.replace(keyword, "", 1).strip()
+                return rule, cleaned
+
+        return "", text
 
     def _clean_title(self, text: str) -> str:
         """清理事件标题，去除噪音词和多余空白
