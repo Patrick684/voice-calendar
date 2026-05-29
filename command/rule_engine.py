@@ -8,6 +8,7 @@ from enum import Enum
 from typing import Optional
 
 from command.time_parser import TimeParser
+from command.recurrence_resolver import RecurrenceResolver
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class ParsedCommand:
     end_time: Optional[datetime] = None
     priority: int = 0
     recurrence_rule: str = ""
+    recurrence_end: Optional[datetime] = None
     original_text: str = ""
     confidence: float = 0.0
 
@@ -148,9 +150,7 @@ class RuleEngine:
         "大约",
         "大概",
         "差不多",
-        "小时",
-        "分钟",
-        "都",  # 循环句式中的“都”不是标题部分（如“每天都要午睡”）
+        "都",  # 循环句式中的"都"不是标题部分（如"每天都要午睡"）
     ]
 
     # 标题首部噪音词（包含助词）
@@ -198,6 +198,7 @@ class RuleEngine:
 
     def __init__(self):
         self._time_parser = TimeParser()
+        self._recurrence_resolver = RecurrenceResolver()
         # 预编译正则（按优先级排列，长词优先）
         self._add_pattern = self._build_keyword_pattern(self.ADD_KEYWORDS)
         self._delete_pattern = self._build_keyword_pattern(self.DELETE_KEYWORDS)
@@ -277,13 +278,26 @@ class RuleEngine:
         priority = self._detect_priority(text)
 
         # 先检测循环规则（必须在时间解析前，否则时间解析器会吞噬"周六"等导致无法匹配"每周六"）
-        recurrence_rule, text_clean = self._detect_recurrence(text_without_keyword)
+        recurrence_rule, text_clean, rec_start, rec_end = self._detect_recurrence(
+            text_without_keyword, base_date=base_date
+        )
         if not recurrence_rule:
-            recurrence_rule, _ = self._detect_recurrence(text)
+            recurrence_rule, _, rec_start, rec_end = self._detect_recurrence(text, base_date=base_date)
             text_clean = text_without_keyword
 
-        # 解析时间（使用已去除循环词的文本）
-        parsed_time, remaining = self._time_parser.parse(text_clean, base_date=base_date)
+        # 如果 resolver 提供了首次发生时间，用作 parsed_time 的基础
+        if rec_start:
+            # 用 resolver 的日期作为时间解析的基准
+            parsed_time, remaining = self._time_parser.parse(text_clean, base_date=rec_start)
+            if parsed_time is None:
+                parsed_time = rec_start
+                remaining = text_clean
+        else:
+            # 解析时间（使用已去除循环词的文本）
+            parsed_time, remaining = self._time_parser.parse(text_clean, base_date=base_date)
+
+        # 持续事件检测
+        end_time, remaining = self._detect_duration(remaining, parsed_time)
 
         # 清理标题
         title = self._clean_title(remaining)
@@ -306,8 +320,10 @@ class RuleEngine:
             command_type=cmd_type,
             title=title,
             time=parsed_time,
+            end_time=end_time,
             priority=priority,
             recurrence_rule=recurrence_rule,
+            recurrence_end=rec_end,
             original_text=text,
             confidence=0.8,
         )
@@ -325,9 +341,19 @@ class RuleEngine:
             ParsedCommand 或 None
         """
         # 先检测循环规则（必须在时间解析前，否则时间解析器会吞噬"周六"等导致无法匹配"每周六"）
-        recurrence_rule, text_clean = self._detect_recurrence(text)
+        recurrence_rule, text_clean, rec_start, rec_end = self._detect_recurrence(text, base_date=base_date)
 
-        parsed_time, remaining = self._time_parser.parse(text_clean, base_date=base_date)
+        if rec_start:
+            parsed_time, remaining = self._time_parser.parse(text_clean, base_date=rec_start)
+            if parsed_time is None:
+                parsed_time = rec_start
+                remaining = text_clean
+        else:
+            parsed_time, remaining = self._time_parser.parse(text_clean, base_date=base_date)
+
+        # 持续事件检测
+        end_time, remaining = self._detect_duration(remaining, parsed_time)
+
         if parsed_time is not None:
             title = self._clean_title(remaining)
             if title:
@@ -335,8 +361,10 @@ class RuleEngine:
                     command_type=CommandType.ADD_EVENT,
                     title=title,
                     time=parsed_time,
+                    end_time=end_time,
                     priority=self._detect_priority(text),
                     recurrence_rule=recurrence_rule,
+                    recurrence_end=rec_end,
                     original_text=text,
                     confidence=0.75,  # 时间解析成功是强信号，隐式指令置信度可提高
                 )
@@ -367,11 +395,12 @@ class RuleEngine:
                 return 1
         return 0
 
-    @classmethod
-    def _detect_recurrence(cls, text: str) -> tuple:
-        """从文本中检测循环规则
+    def _detect_recurrence(self, text: str, base_date: Optional[datetime] = None) -> tuple:
+        """从文本中检测循环规则（委托给 RecurrenceResolver）
 
         支持的模式:
+        - 范围内每天: "下周每天"/"这周每天" (带 UNTIL)
+        - 每月X号: "每个月1号" (带 BYMONTHDAY)
         - 每天/每日 → FREQ=DAILY
         - 每周/每个星期 → FREQ=WEEKLY
         - 每周X/每个星期X → FREQ=WEEKLY;BYDAY=XX
@@ -381,34 +410,83 @@ class RuleEngine:
 
         Args:
             text: 输入文本
+            base_date: 基准日期
 
         Returns:
-            (recurrence_rule, cleaned_text) 元组
+            (recurrence_rule, cleaned_text, start_time, end_time) 四元组
         """
         if not text:
-            return "", text
+            return "", text, None, None
 
-        # 尝试匹配 “每周X” / “每个星期X” (带星期后缀)
-        weekday_pattern = re.compile(r"(?:每周|每个星期)([一二三四五六日天])")
-        m = weekday_pattern.search(text)
-        if m:
-            day_char = m.group(1)
-            day_code = cls.WEEKDAY_MAP.get(day_char, "")
-            if day_code:
-                rule = f"FREQ=WEEKLY;BYDAY={day_code}"
+        result = self._recurrence_resolver.resolve(text, base_date=base_date)
+        return result.rule, result.cleaned_text, result.start_time, result.end_time
+
+    # 持续时长检测模式
+    _DURATION_PATTERNS = [
+        (re.compile(r"([一二两三四五六七八九十\d]+)\s*个?半小时"), 0.5, "hour"),  # "一个半小时"
+        (re.compile(r"([一二两三四五六七八九十\d]+)\s*个?小时"), 1.0, "hour"),  # "三小时"
+        (re.compile(r"半小时"), 0.5, "hour"),  # "半小时"
+        (re.compile(r"([一二两三四五六七八九十\d]+)\s*分钟"), 1.0, "minute"),  # "30分钟"
+        (re.compile(r"一整天"), 8.0, "hour"),  # "一整天" → 8小时
+    ]
+    _CN_NUM_MAP = {
+        "一": 1,
+        "二": 2,
+        "两": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "七": 7,
+        "八": 8,
+        "九": 9,
+        "十": 10,
+    }
+
+    @classmethod
+    def _detect_duration(cls, text: str, start_time: Optional[datetime] = None) -> tuple:
+        """从文本中检测持续时长，计算 end_time
+
+        Args:
+            text: 剩余文本（时间解析后）
+            start_time: 事件开始时间
+
+        Returns:
+            (end_time, cleaned_text) 元组
+        """
+        if not text or start_time is None:
+            return None, text
+
+        from datetime import timedelta
+
+        for pattern, multiplier, unit in cls._DURATION_PATTERNS:
+            m = pattern.search(text)
+            if m:
+                # 提取数值
+                if m.lastindex and m.lastindex >= 1:
+                    num_str = m.group(1)
+                    try:
+                        num = int(num_str)
+                    except ValueError:
+                        num = cls._CN_NUM_MAP.get(num_str, 0)
+                else:
+                    # 无捕获组（如"半小时"、"一整天"）
+                    num = 1
+
+                if num <= 0:
+                    continue
+
+                if unit == "hour":
+                    duration_minutes = int(num * multiplier * 60)
+                else:
+                    duration_minutes = int(num * multiplier)
+
+                end_time = start_time + timedelta(minutes=duration_minutes)
                 cleaned = text[: m.start()] + text[m.end() :]
-                return rule, cleaned.strip()
+                logger.info(f"持续事件检测: {num}{unit} → end_time={end_time.strftime('%H:%M')}")
+                return end_time, cleaned.strip()
 
-        # 尝试匹配固定模式列表
-        for keyword, freq, extra in cls.RECURRENCE_PATTERNS:
-            if keyword in text:
-                rule = f"FREQ={freq}"
-                if extra:
-                    rule += f";{extra}"
-                cleaned = text.replace(keyword, "", 1).strip()
-                return rule, cleaned
-
-        return "", text
+        return None, text
 
     def _clean_title(self, text: str) -> str:
         """清理事件标题，去除噪音词和多余空白

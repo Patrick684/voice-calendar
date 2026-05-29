@@ -358,8 +358,10 @@ class VoiceCalendarApp:
         self._calendar.add_event(
             title=command.title,
             start_time=command.time,
+            end_time=getattr(command, "end_time", None),
             priority=getattr(command, "priority", 0),
             recurrence_rule=getattr(command, "recurrence_rule", ""),
+            recurrence_end=getattr(command, "recurrence_end", None),
         )
         time_str = command.time.strftime("%m月%d日 %H:%M")
         msg = f"已添加: {command.title} ({time_str})"

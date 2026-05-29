@@ -1074,10 +1074,18 @@ def test_intent_classifier_inference():
     print(f"  [通过] 模型加载成功 (device={clf.device})")
     print(f"         标签: {clf.label_names}")
 
-    # 验证标签完整性
-    expected_labels = {"add_event", "query_event", "delete_event", "update_event", "other"}
-    assert set(clf.label_names) == expected_labels, f"标签不匹配: {set(clf.label_names)} vs {expected_labels}"
-    print("  [通过] 标签完整性验证")
+    # 验证标签完整性（支持 5 类或 8 类标签）
+    expected_labels_5 = {"add_event", "query_event", "delete_event", "update_event", "other"}
+    expected_labels_8 = expected_labels_5 | {"add_recurring", "delete_recurring", "update_recurring"}
+    actual_labels = set(clf.label_names)
+    has_recurring = actual_labels == expected_labels_8
+    if actual_labels == expected_labels_5:
+        print("  [通过] 标签完整性验证 (5类)")
+    elif has_recurring:
+        print("  [通过] 标签完整性验证 (8类，含循环标签)")
+    else:
+        assert False, f"标签不匹配: {actual_labels}"
+    expected_labels = actual_labels
 
     # 单条推理测试
     test_cases = [
@@ -1292,6 +1300,154 @@ def test_asr_text_correction():
     print()
 
 
+def test_recurrence_resolver():
+    """测试 RecurrenceResolver 循环日期计算"""
+    print("=" * 50)
+    print("测试 RecurrenceResolver")
+    print("=" * 50)
+
+    from command.recurrence_resolver import RecurrenceResolver
+
+    resolver = RecurrenceResolver()
+    now = datetime.now()
+    weekday = now.weekday()  # 0=周一
+
+    # 1. 下周每天 -> FREQ=DAILY, UNTIL=下周日
+    r = resolver.resolve("下周每天下午三点健身", base_date=now)
+    assert r.rule == "FREQ=DAILY", f"规则错误: {r.rule}"
+    assert r.end_time is not None, "UNTIL 不应为 None"
+    next_monday = now + timedelta(days=7 - weekday)
+    next_sunday = next_monday + timedelta(days=6)
+    assert r.end_time.date() == next_sunday.date(), f"UNTIL 日期错误: {r.end_time.date()} vs {next_sunday.date()}"
+    assert "下午三点健身" in r.cleaned_text, f"cleaned_text 错误: {r.cleaned_text}"
+    print(f"  [通过] 下周每天: rule={r.rule}, end={r.end_time.strftime('%m-%d')}")
+
+    # 2. 这周每天 (前向) -> UNTIL=本周日
+    r = resolver.resolve("这周每天上午九点起床", base_date=now)
+    assert r.rule == "FREQ=DAILY", f"规则错误: {r.rule}"
+    this_sunday = now + timedelta(days=6 - weekday)
+    assert r.end_time.date() == this_sunday.date(), f"UNTIL 日期错误: {r.end_time.date()} vs {this_sunday.date()}"
+    print(f"  [通过] 这周每天(前向): end={r.end_time.strftime('%m-%d')}")
+
+    # 3. 这周每天 + 过去时态 (后向) -> 周一到今天
+    r = resolver.resolve("这周每天下午两点都学习了", base_date=now)
+    assert r.rule == "FREQ=DAILY", f"规则错误: {r.rule}"
+    this_monday = now - timedelta(days=weekday)
+    assert r.start_time.date() == this_monday.date(), f"start 日期错误: {r.start_time.date()}"
+    assert r.end_time.date() == now.date(), f"end 日期错误: {r.end_time.date()} vs {now.date()}"
+    print(f"  [通过] 这周每天(后向): start={r.start_time.strftime('%m-%d')}, end={r.end_time.strftime('%m-%d')}")
+
+    # 4. 每个月1号 -> BYMONTHDAY=1
+    r = resolver.resolve("每个月1号下午三点存工资", base_date=now)
+    assert "BYMONTHDAY=1" in r.rule, f"规则错误: {r.rule}"
+    assert r.end_time is None, "无限循环不应有 UNTIL"
+    assert "下午三点存工资" in r.cleaned_text, f"cleaned_text 错误: {r.cleaned_text}"
+    print(f"  [通过] 每个月1号: rule={r.rule}")
+
+    # 5. 每月15号 -> BYMONTHDAY=15
+    r = resolver.resolve("每月15号上午十点交房租", base_date=now)
+    assert "BYMONTHDAY=15" in r.rule, f"规则错误: {r.rule}"
+    print(f"  [通过] 每月15号: rule={r.rule}")
+
+    # 6. 每天 (无范围) -> FREQ=DAILY, 无 UNTIL
+    r = resolver.resolve("每天下午两点午睡", base_date=now)
+    assert r.rule == "FREQ=DAILY", f"规则错误: {r.rule}"
+    assert r.end_time is None, "无限循环不应有 UNTIL"
+    print(f"  [通过] 每天(无限): rule={r.rule}")
+
+    # 7. 每周六 -> WEEKLY;BYDAY=SA
+    r = resolver.resolve("每周六下午五点健身", base_date=now)
+    assert "BYDAY=SA" in r.rule, f"规则错误: {r.rule}"
+    print(f"  [通过] 每周六: rule={r.rule}")
+
+    # 8. 工作日 -> WEEKLY;BYDAY=MO,TU,WE,TH,FR
+    r = resolver.resolve("工作日早上九点打卡", base_date=now)
+    assert "BYDAY=MO,TU,WE,TH,FR" in r.rule, f"规则错误: {r.rule}"
+    print(f"  [通过] 工作日: rule={r.rule}")
+
+    print()
+
+
+def test_duration_detection():
+    """测试持续事件时长检测"""
+    print("=" * 50)
+    print("测试持续事件检测")
+    print("=" * 50)
+
+    from command.rule_engine import RuleEngine
+
+    engine = RuleEngine()
+
+    # 1. 学习三小时
+    r = engine.parse("明天下午两点学习三小时")
+    assert r.end_time is not None, "end_time 不应为 None"
+    assert r.time is not None, "time 不应为 None"
+    duration_min = (r.end_time - r.time).total_seconds() / 60
+    assert duration_min == 180, f"时长错误: {duration_min} 分钟"
+    assert r.title == "学习", f"标题错误: {r.title}"
+    print(f"  [通过] 学习三小时: end_time={r.end_time.strftime('%H:%M')}, title={r.title}")
+
+    # 2. 开会半小时
+    r = engine.parse("明天下午两点开会半小时")
+    assert r.end_time is not None, "end_time 不应为 None"
+    duration_min = (r.end_time - r.time).total_seconds() / 60
+    assert duration_min == 30, f"时长错误: {duration_min} 分钟"
+    print(f"  [通过] 开会半小时: end_time={r.end_time.strftime('%H:%M')}")
+
+    # 3. 跑步45分钟
+    r = engine.parse("明天下午两点跑步45分钟")
+    assert r.end_time is not None, "end_time 不应为 None"
+    duration_min = (r.end_time - r.time).total_seconds() / 60
+    assert duration_min == 45, f"时长错误: {duration_min} 分钟"
+    print(f"  [通过] 跑步45分钟: end_time={r.end_time.strftime('%H:%M')}")
+
+    # 4. 非持续事件
+    r = engine.parse("明天下午三点开会")
+    assert r.end_time is None, f"非持续事件不应有 end_time: {r.end_time}"
+    print("  [通过] 非持续事件: end_time=None")
+
+    print()
+
+
+def test_scoped_recurring_integration():
+    """测试有界循环事件展开集成"""
+    print("=" * 50)
+    print("测试有界循环事件展开")
+    print("=" * 50)
+
+    import tempfile
+    from calendar_pkg.manager import CalendarManager
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        mgr = CalendarManager(db_path=db_path)
+
+        now = datetime.now()
+        weekday = now.weekday()
+        next_monday = (now + timedelta(days=7 - weekday)).replace(hour=15, minute=0, second=0, microsecond=0)
+        next_sunday = (next_monday + timedelta(days=6)).replace(hour=23, minute=59, second=59)
+
+        event = mgr.add_event(
+            title="下周健身",
+            start_time=next_monday,
+            recurrence_rule="FREQ=DAILY",
+            recurrence_end=next_sunday,
+        )
+        assert event.id is not None, "事件创建失败"
+
+        # 查询下周范围
+        range_start = next_monday - timedelta(days=1)
+        range_end = next_sunday + timedelta(days=1)
+        events = mgr.get_events_by_range(range_start, range_end)
+
+        # 应包含原始事件 + 6 个展开实例 = 7
+        recurring_instances = [e for e in events if e.title == "下周健身"]
+        assert len(recurring_instances) == 7, f"期望7个实例，实际: {len(recurring_instances)}"
+        print(f"  [通过] 下周每天展开: {len(recurring_instances)} 个实例")
+
+    print()
+
+
 if __name__ == "__main__":
     print("\n指令解析层功能验证\n")
     try:
@@ -1319,6 +1475,9 @@ if __name__ == "__main__":
         test_parser_with_intent_model()
         test_interaction_log_regressions()
         test_asr_text_correction()
+        test_recurrence_resolver()
+        test_duration_detection()
+        test_scoped_recurring_integration()
         print("=" * 50)
         print("全部测试通过!")
         print("=" * 50)

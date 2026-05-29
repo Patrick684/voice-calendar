@@ -43,7 +43,16 @@ INTENT_MAP = {
     # other: 其余全部
 }
 DEFAULT_LABEL = "other"
-LABEL_NAMES = ["add_event", "query_event", "delete_event", "update_event", "other"]
+LABEL_NAMES = [
+    "add_event",
+    "add_recurring",
+    "delete_event",
+    "delete_recurring",
+    "update_event",
+    "update_recurring",
+    "query_event",
+    "other",
+]
 
 # --- 语气词/填充词（用于增强） ---
 FILLER_WORDS = ["嗯", "那个", "帮我", "请", "给我", "麻烦", "一下", "啊", "呢", "吧"]
@@ -94,6 +103,74 @@ EVENT_WORDS = [
     "出差",
     "报告",
     "答辩",
+]
+
+# --- 循环事件样本 ---
+RECURRING_EVENTS = [
+    "起床",
+    "健身",
+    "吃药",
+    "吃饭",
+    "上班",
+    "打卡",
+    "学习",
+    "跑步",
+    "午睡",
+    "散步",
+    "读书",
+    "背单词",
+    "瑜伽",
+    "游泳",
+]
+WEEKDAY_WORDS = ["一", "二", "三", "四", "五", "六", "日"]
+DAY_WORDS = ["1", "5", "10", "15", "20", "25"]
+REC_TIME_WORDS = ["上午九点", "下午三点", "晚上八点", "早上七点", "中午十二点", "下午两点", "傍晚六点"]
+
+RECURRING_ADD_TEMPLATES = [
+    "每天{time}{event}",
+    "每日{time}{event}",
+    "每周{weekday}{time}{event}",
+    "每个星期{weekday}{time}{event}",
+    "每个月{day}号{time}{event}",
+    "每月{day}号{event}",
+    "工作日{time}{event}",
+    "周一到周五{time}{event}",
+    "下周每天{time}{event}",
+    "这周每天{time}{event}",
+    "每天都要{event}",
+    "每天{time}都要{event}",
+    "提醒我每天{time}{event}",
+    "帮我设置每天{time}的{event}",
+    "每{weekday}下午{event}",
+    "安排每天{event}",
+    "设置每周{weekday}的{event}",
+    "我要每天{time}{event}",
+    "坚持每天{event}",
+    "养成每天{time}{event}的习惯",
+]
+
+RECURRING_DELETE_TEMPLATES = [
+    "取消每天的{event}",
+    "不要每天{event}了",
+    "停止每周{weekday}的{event}",
+    "把每月的{event}取消掉",
+    "不用每天{event}了",
+    "删掉每天{time}的{event}",
+    "取消每周{weekday}的{event}",
+    "别再每天{event}了",
+    "去掉每天的{event}提醒",
+    "把每天的{event}删了",
+]
+
+RECURRING_UPDATE_TEMPLATES = [
+    "把每天的{event}改到{time}",
+    "把每周{weekday}的{event}推迟一小时",
+    "每天的{event}改成{time}",
+    "把每天的{event}提前半小时",
+    "修改每周{weekday}的{event}时间",
+    "把每月的{event}改到{day}号",
+    "调整每天{event}的时间",
+    "工作日的{event}改到{time}",
 ]
 TIME_WORDS = [
     "明天",
@@ -193,6 +270,59 @@ def generate_update_events(count: int) -> list[dict]:
     return samples
 
 
+def generate_recurring_samples(count: int) -> tuple[list[dict], list[dict], list[dict]]:
+    """合成循环事件样本 (add_recurring, delete_recurring, update_recurring)
+
+    Returns:
+        (add_samples, delete_samples, update_samples) 三元组
+    """
+    add_samples = []
+    for _ in range(count):
+        template = random.choice(RECURRING_ADD_TEMPLATES)
+        event = random.choice(RECURRING_EVENTS)
+        time = random.choice(REC_TIME_WORDS)
+        weekday = random.choice(WEEKDAY_WORDS)
+        day = random.choice(DAY_WORDS)
+        text = template.format(event=event, time=time, weekday=weekday, day=day)
+        add_samples.append({"text": text, "label": "add_recurring"})
+
+    delete_samples = []
+    for _ in range(count // 2):
+        template = random.choice(RECURRING_DELETE_TEMPLATES)
+        event = random.choice(RECURRING_EVENTS)
+        time = random.choice(REC_TIME_WORDS)
+        weekday = random.choice(WEEKDAY_WORDS)
+        text = template.format(event=event, time=time, weekday=weekday)
+        delete_samples.append({"text": text, "label": "delete_recurring"})
+
+    update_samples = []
+    for _ in range(count // 2):
+        template = random.choice(RECURRING_UPDATE_TEMPLATES)
+        event = random.choice(RECURRING_EVENTS)
+        time = random.choice(REC_TIME_WORDS)
+        weekday = random.choice(WEEKDAY_WORDS)
+        day = random.choice(DAY_WORDS)
+        text = template.format(event=event, time=time, weekday=weekday, day=day)
+        update_samples.append({"text": text, "label": "update_recurring"})
+
+    return add_samples, delete_samples, update_samples
+
+
+# 循环关键词（用于重标注 MASSIVE 数据中的循环样本）
+_RECURRING_KEYWORDS = ["每天", "每日", "每周", "每月", "每年", "每个星期", "工作日", "重复", "循环"]
+
+
+def relabel_recurring_samples(data: list[dict]) -> list[dict]:
+    """将 MASSIVE 中含循环关键词的 add_event 样本重标注为 add_recurring"""
+    relabeled = []
+    for item in data:
+        if item["label"] == "add_event" and any(kw in item["text"] for kw in _RECURRING_KEYWORDS):
+            relabeled.append({"text": item["text"], "label": "add_recurring"})
+        else:
+            relabeled.append(item)
+    return relabeled
+
+
 def augment_class(data: list[dict], target_label: str, target_count: int, use_colloquial: bool = False) -> list[dict]:
     """对小类进行增强至目标数量
 
@@ -255,8 +385,13 @@ def main():
     raw_data = load_massive_zh_cn(MASSIVE_ZH_CN_PATH)
     print(f"  原始样本数: {len(raw_data)}")
 
-    print("\nStep 2: 映射意图为 5 类...")
+    print("\nStep 2: 映射意图为 8 类...")
     mapped = map_intents(raw_data)
+
+    # 重标注循环样本
+    mapped = relabel_recurring_samples(mapped)
+    n_relabeled = sum(1 for d in mapped if d["label"] == "add_recurring")
+    print(f"  重标注循环样本: {n_relabeled} 条 add_event -> add_recurring")
     print_distribution(mapped, "映射后分布（增强前）")
 
     print("\nStep 3: 数据增强...")
@@ -267,6 +402,12 @@ def main():
     # 合成 update_event
     update_samples = generate_update_events(AUGMENT_TARGET)
     print(f"  update_event: 0 -> {len(update_samples)} (合成)")
+
+    # 合成循环事件样本
+    rec_add, rec_del, rec_upd = generate_recurring_samples(AUGMENT_TARGET)
+    print(f"  add_recurring: {len(rec_add)} (合成)")
+    print(f"  delete_recurring: {len(rec_del)} (合成)")
+    print(f"  update_recurring: {len(rec_upd)} (合成)")
 
     # 裁剪 other 样本（去除冗余无关意图）
     other_samples = [d for d in mapped if d["label"] == "other"]
@@ -292,7 +433,7 @@ def main():
         print(f"  {label}: {len(samples)} -> {len(samples) + len(aug_samples)} (+口语增强)")
 
     # 合并所有数据
-    final_data = calendar_augmented + delete_augmented + update_samples + other_samples
+    final_data = calendar_augmented + delete_augmented + update_samples + other_samples + rec_add + rec_del + rec_upd
     print_distribution(final_data, "增强后分布")
 
     print("\nStep 4: Stratified train/dev/test 分割...")
