@@ -29,3 +29,6 @@
 {"text": "PyTorchJavaScript", "label": "unknown", "expected_title": "", "expected_recurrence": "", "note": "\u6280\u672f\u8bcd\u5e7b\u89c9\uff0c\u5e94\u8bc6\u522b\u4e3a unknown", "accepted": true}
 {"text": "\u5e2e\u6211\u8ba2\u4e00\u5f20\u53bb\u5317\u4eac\u7684\u673a\u7968", "label": "unknown", "expected_title": "", "expected_recurrence": "", "note": "\u975e\u65e5\u5386\u610f\u56fe", "accepted": true}
 {"text": "\u4eca\u5929\u5929\u6c14\u600e\u4e48\u6837", "label": "add_event", "expected_title": "\u5929\u6c14\u600e\u4e48\u6837", "expected_recurrence": "", "note": "\u89c4\u5219\u5f15\u64ce\u8bef\u8bc6\u522b\uff0c\u9700\u610f\u56fe\u6a21\u578b\u7ea0\u6b63", "accepted": false}
+{"text": "6月1日 凌晨3点 不开会了。", "label": "delete_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "这株每天下午两点都要五岁。", "label": "add_event", "expected_title": "午睡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "Whisper误识别(这株→这周, 五岁→午睡)，ASR修正后可解析", "accepted": false}
+{"text": "这一周每天下，午两点都要五睡。", "label": "add_event", "expected_title": "午睡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "Whisper插入逗号(下，午→下午) + 误识别(五睡→午睡)，ASR修正后可解析", "accepted": false}

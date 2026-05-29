@@ -335,10 +335,9 @@ class MainWindow(ctk.CTk):
         )
         cell.grid(row=row, column=col, sticky="nsew", padx=1, pady=1)
 
-        # 拖拽放置目标（左键按下 + 移动阈值）
+        # 拖拽放置目标（视觉反馈）
         cell.bind("<Enter>", lambda e, ds=date_str: self._on_drag_enter(ds))
         cell.bind("<Leave>", lambda e, ds=date_str: self._on_drag_leave(ds))
-        cell.bind("<ButtonRelease-1>", lambda e, ds=date_str: self._on_drag_drop(ds))
 
         self._day_cells[date_str] = cell
 
@@ -347,6 +346,12 @@ class MainWindow(ctk.CTk):
         # 清空旧内容
         for widget in self._event_scroll.winfo_children():
             widget.destroy()
+
+        # 重置滚动位置到顶部
+        try:
+            self._event_scroll._parent_canvas.yview_moveto(0)
+        except Exception:
+            pass
 
         try:
             date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -440,6 +445,14 @@ class MainWindow(ctk.CTk):
             lambda e, ev=event: self._select_event(ev),
         )
 
+        # 右键菜单（快捷编辑）
+        if event.id is not None:
+            self._bind_context_menu(card, event)
+            for child in card.winfo_children():
+                self._bind_context_menu(child, event)
+                for grandchild in child.winfo_children():
+                    self._bind_context_menu(grandchild, event)
+
         # 左键拖拽（仅真实事件，移动阈值区分点击/拖拽）
         if event.id is not None:
             self._bind_drag_events(card, event)
@@ -458,8 +471,75 @@ class MainWindow(ctk.CTk):
     def _bind_drag_events(self, widget, event: CalendarEvent):
         """绑定左键拖拽事件（带移动阈值）"""
         widget.bind("<ButtonPress-1>", lambda e, ev=event: self._on_press(e, ev))
-        widget.bind("<B1-Motion>", self._on_motion)
-        widget.bind("<ButtonRelease-1>", lambda e, ev=event: self._on_release(e, ev))
+
+    def _bind_context_menu(self, widget, event: CalendarEvent):
+        """绑定右键菜单"""
+        widget.bind("<Button-3>", lambda e, ev=event: self._show_context_menu(e, ev))
+
+    def _show_context_menu(self, event, cal_event: CalendarEvent):
+        """显示右键快捷编辑菜单"""
+        import tkinter as tk
+
+        menu = tk.Menu(self, tearoff=0)
+
+        # 优先级子菜单
+        priority_menu = tk.Menu(menu, tearoff=0)
+        priority_labels = [("普通", 0), ("★ 重要", 1), ("❗ 紧急", 2), ("❗❗ 最高", 3)]
+        for label, level in priority_labels:
+            marker = "✓ " if cal_event.priority == level else "   "
+            priority_menu.add_command(
+                label=marker + label,
+                command=lambda e=cal_event, p=level: self._quick_set_priority(e, p),
+            )
+        menu.add_cascade(label="优先级", menu=priority_menu)
+
+        # 分类子菜单
+        category_menu = tk.Menu(menu, tearoff=0)
+        categories = ["工作", "健康", "学习", "生活", "娱乐", "社交", "其他"]
+        for cat in categories:
+            marker = "✓ " if cal_event.category == cat else "   "
+            category_menu.add_command(
+                label=marker + cat,
+                command=lambda e=cal_event, c=cat: self._quick_set_category(e, c),
+            )
+        menu.add_cascade(label="分类", menu=category_menu)
+
+        menu.add_separator()
+        menu.add_command(label="编辑详情...", command=lambda: self._open_event_dialog(cal_event))
+        menu.add_command(
+            label="删除",
+            command=lambda: self._quick_delete(cal_event),
+        )
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _quick_set_priority(self, cal_event: CalendarEvent, priority: int):
+        """快捷设置优先级"""
+        if cal_event.id is None:
+            return
+        self._manager.update_event(cal_event.id, priority=priority)
+        logger.info(f"快捷设置优先级: {cal_event.title} → {priority}")
+        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"))
+
+    def _quick_set_category(self, cal_event: CalendarEvent, category: str):
+        """快捷设置分类"""
+        if cal_event.id is None:
+            return
+        self._manager.update_event(cal_event.id, category=category)
+        logger.info(f"快捷设置分类: {cal_event.title} → {category}")
+        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"))
+
+    def _quick_delete(self, cal_event: CalendarEvent):
+        """快捷删除事件"""
+        if cal_event.id is None:
+            return
+        self._manager.delete_event(cal_event.id)
+        logger.info(f"快捷删除: {cal_event.title}")
+        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"))
+        self._refresh_calendar()
 
     # ================================================================
     # 拖拽排序（左键 + 移动阈值）
@@ -468,7 +548,7 @@ class MainWindow(ctk.CTk):
     _DRAG_THRESHOLD = 5  # 像素阈值，超过才算拖拽
 
     def _on_press(self, event, cal_event: CalendarEvent):
-        """左键按下 - 记录起始位置"""
+        """左键按下 - 记录起始位置，绑定全局拖拽事件"""
         self._drag_data = {
             "event": cal_event,
             "source_date": cal_event.start_time.strftime("%Y-%m-%d"),
@@ -476,6 +556,9 @@ class MainWindow(ctk.CTk):
             "start_y": event.y_root,
             "dragging": False,
         }
+        # 绑定全局事件（确保在离开原始 widget 后仍能捕获运动和释放）
+        self._drag_motion_id = self.bind_all("<B1-Motion>", self._on_motion, add="+")
+        self._drag_release_id = self.bind_all("<ButtonRelease-1>", self._on_global_release, add="+")
 
     def _on_motion(self, event):
         """左键拖拽中 - 超过阈值进入拖拽模式"""
@@ -492,10 +575,43 @@ class MainWindow(ctk.CTk):
             if source_cell:
                 source_cell.configure(fg_color="#e67e22")
 
-    def _on_release(self, event, cal_event: CalendarEvent):
-        """左键释放 - 判断是点击还是拖拽"""
+    def _on_global_release(self, event):
+        """全局释放处理（先解绑全局事件，再判断放置目标）"""
+        # 解绑全局事件
+        try:
+            self.unbind_all("<B1-Motion>")
+            self.unbind_all("<ButtonRelease-1>")
+        except Exception:
+            pass
+
+        if not self._drag_data.get("event"):
+            return
+
+        cal_event = self._drag_data["event"]
+
         if self._drag_data.get("dragging"):
-            # 拖拽模式：放置已由 _on_drag_drop 处理
+            # 拖拽模式：检查释放位置是否在日期格子上
+            # 通过遍历日期格子检查光标位置
+            dropped = False
+            for date_str, cell in self._day_cells.items():
+                try:
+                    # 获取日期格子的屏幕坐标范围
+                    cell.update_idletasks()
+                    x1 = cell.winfo_rootx()
+                    y1 = cell.winfo_rooty()
+                    x2 = x1 + cell.winfo_width()
+                    y2 = y1 + cell.winfo_height()
+                    if x1 <= event.x_root <= x2 and y1 <= event.y_root <= y2:
+                        self._on_drag_drop(date_str)
+                        dropped = True
+                        break
+                except Exception:
+                    continue
+
+            if not dropped:
+                # 没有放在日期格子上，撤销拖拽状态
+                self._refresh_calendar()
+
             self._drag_data = {
                 "event": None,
                 "source_date": None,
@@ -503,9 +619,8 @@ class MainWindow(ctk.CTk):
                 "start_y": 0,
                 "dragging": False,
             }
-            self._refresh_calendar()
         else:
-            # 点击模式：打开编辑对话框
+            # 点击模式：选中事件（显示时间拨盘）
             self._drag_data = {
                 "event": None,
                 "source_date": None,
@@ -513,7 +628,7 @@ class MainWindow(ctk.CTk):
                 "start_y": 0,
                 "dragging": False,
             }
-            self._open_event_dialog(cal_event)
+            self._select_event(cal_event)
 
     def _on_drag_enter(self, date_str: str):
         """拖拽进入日期格子"""
