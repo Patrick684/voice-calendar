@@ -1227,6 +1227,71 @@ def test_interaction_log_regressions():
     print()
 
 
+def test_asr_text_correction():
+    """测试 ASR 后处理纠错链路"""
+    print("=" * 50)
+    print("测试 ASR 后处理纠错")
+    print("=" * 50)
+
+    from engine.text_corrector import TextCorrector
+
+    corrector = TextCorrector(enabled=True)
+
+    # 日历场景同音纠错
+    test_cases = [
+        ("这株每天下午两点都要五岁", "这周每天下午两点都要午睡", "日历同音: 这株→这周, 五岁→午睡"),
+        ("名天下午三点开会", "明天下午三点开会", "日历同音: 名天→明天"),
+        ("后添上午十点看牙", "后天上午十点看牙", "日历同音: 后添→后天"),
+        ("今天晚上八点见身", "今天晚上八点健身", "日历同音: 见身→健身"),
+        ("零晨三点开会", "凌晨三点开会", "日历同音: 零晨→凌晨"),
+    ]
+
+    for input_text, expected_contains, desc in test_cases:
+        result = corrector.correct(input_text)
+        # 检查关键部分是否被纠正
+        # 注: 的/地/得规则可能会添加“的”，所以用 in 检查
+        assert expected_contains in result or result == expected_contains, (
+            f"{desc} 失败: '{input_text}' → '{result}', 期望包含 '{expected_contains}'"
+        )
+        print(f"  [通过] {desc}")
+
+    # PostProcessor 拼音规则测试
+    from engine.post_processor import PostProcessor
+
+    pp = PostProcessor()
+
+    pp_cases = [
+        ("这株每天下午两点都要五睡", "这周", "PostProcessor: 这株→这周"),
+        ("名天下午三点面试", "明天", "PostProcessor: 名天→明天"),
+        ("后添上午十点看牙", "后天", "PostProcessor: 后添→后天"),
+        ("五睡两个小时", "午睡", "PostProcessor: 五睡→午睡"),
+    ]
+
+    for input_text, expected_contains, desc in pp_cases:
+        result = pp.process(input_text)
+        assert expected_contains in result, f"{desc} 失败: '{input_text}' → '{result}', 期望包含 '{expected_contains}'"
+        print(f"  [通过] {desc}")
+
+    # TimeParser 时间词纠错测试
+    tp_cases = [
+        ("帮晚六点吃饭", "傍晚", "TimeParser: 帮晚→傍晚"),
+        ("零晨三点开会", "凌晨", "TimeParser: 零晨→凌晨"),
+    ]
+
+    from command.time_parser import TimeParser
+
+    tp = TimeParser()
+    for input_text, expected_keyword, desc in tp_cases:
+        # _fuzzy_correct 是 classmethod，直接调用
+        corrected = TimeParser._fuzzy_correct_time_keywords(input_text)
+        assert expected_keyword in corrected, (
+            f"{desc} 失败: '{input_text}' → '{corrected}', 期望包含 '{expected_keyword}'"
+        )
+        print(f"  [通过] {desc}")
+
+    print()
+
+
 if __name__ == "__main__":
     print("\n指令解析层功能验证\n")
     try:
@@ -1253,6 +1318,7 @@ if __name__ == "__main__":
         test_intent_classifier_inference()
         test_parser_with_intent_model()
         test_interaction_log_regressions()
+        test_asr_text_correction()
         print("=" * 50)
         print("全部测试通过!")
         print("=" * 50)

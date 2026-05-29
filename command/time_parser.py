@@ -23,6 +23,7 @@ class TimeParser:
 
     # 时间关键词及其拼音基准（用于近音纠错）
     TIME_KEYWORD_PINYIN = {
+        # 日期词
         "明天": ["ming", "tian"],
         "后天": ["hou", "tian"],
         "今天": ["jin", "tian"],
@@ -30,11 +31,21 @@ class TimeParser:
         "前天": ["qian", "tian"],
         "大后天": ["da", "hou", "tian"],
         "大前天": ["da", "qian", "tian"],
+        # 晚上/夜间
         "今晚": ["jin", "wan"],
         "明晚": ["ming", "wan"],
+        # 时段词
         "上午": ["shang", "wu"],
         "下午": ["xia", "wu"],
         "晚上": ["wan", "shang"],
+        "早上": ["zao", "shang"],
+        "早晨": ["zao", "chen"],
+        "中午": ["zhong", "wu"],
+        "傍晚": ["bang", "wan"],
+        "凌晨": ["ling", "chen"],
+        # 周相关
+        "下周": ["xia", "zhou"],
+        "这周": ["zhe", "zhou"],
     }
 
     # 中文数字到阿拉伯数字映射
