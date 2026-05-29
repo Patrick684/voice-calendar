@@ -234,7 +234,7 @@ class MainWindow(ctk.CTk):
         is_today, is_selected, has_event,
     ):
         """创建单个日期格子"""
-        bg_color = "transparent"
+        bg_color = "#2b2b2b"  # 深灰底色，确保白色文字可读
         text_color = "white"
 
         if is_selected:
@@ -386,12 +386,21 @@ class MainWindow(ctk.CTk):
             self._refresh_calendar()
             self._refresh_event_list()
 
-        EventDialog(self, event=event, on_save=on_save, on_delete=on_delete)
+        EventDialog(
+            self, event=event, on_save=on_save, on_delete=on_delete,
+            default_date=self._selected_date,
+        )
 
     def _on_voice_click(self):
-        """语音按钮点击"""
-        if self._on_voice_start:
-            self._on_voice_start()
+        """语音按钮点击 - 切换录音/停止"""
+        if self._voice_panel._state == VoiceState.RECORDING:
+            # 录音中 → 停止
+            if self._on_voice_stop:
+                self._on_voice_stop()
+        else:
+            # 空闲/完成/错误 → 开始录音
+            if self._on_voice_start:
+                self._on_voice_start()
 
     def _refresh_event_list(self):
         """刷新当前选中日期的事件列表"""

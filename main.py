@@ -262,7 +262,7 @@ class VoiceCalendarApp:
 
         # 标点恢复
         if self.config.get("punctuation_optimization", True):
-            text = self._punctuation_restorer.process(text)
+            text = self._punctuation_restorer.restore(text)
             text = self._punctuation_processor.process(text)
 
         return text

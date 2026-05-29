@@ -20,6 +20,7 @@ class EventDialog(ctk.CTkToplevel):
         event: Optional[CalendarEvent] = None,
         on_save: Optional[Callable[[dict], None]] = None,
         on_delete: Optional[Callable[[int], None]] = None,
+        default_date: Optional[datetime] = None,
     ):
         """
         初始化事件对话框
@@ -29,12 +30,14 @@ class EventDialog(ctk.CTkToplevel):
             event: 编辑模式传入已有事件，添加模式传 None
             on_save: 保存回调，接收事件数据字典
             on_delete: 删除回调，接收事件 ID
+            default_date: 默认日期（用于添加模式预填日期）
         """
         super().__init__(master)
         self._event = event
         self._on_save = on_save
         self._on_delete = on_delete
         self._is_edit = event is not None
+        self._default_date = default_date
 
         self.title("编辑事件" if self._is_edit else "添加事件")
         self.geometry("420x480")
@@ -67,12 +70,12 @@ class EventDialog(ctk.CTkToplevel):
         ctk.CTkLabel(self, text="日期:", font=ctk.CTkFont(size=13)).grid(
             row=1, column=0, sticky="w", **pad
         )
-        now = datetime.now()
         self._date_entry = ctk.CTkEntry(
             self, width=300,
             placeholder_text="YYYY-MM-DD",
         )
-        self._date_entry.insert(0, now.strftime("%Y-%m-%d"))
+        init_date = self._default_date if self._default_date else datetime.now()
+        self._date_entry.insert(0, init_date.strftime("%Y-%m-%d"))
         self._date_entry.grid(row=1, column=1, sticky="ew", **pad)
 
         # 时间
