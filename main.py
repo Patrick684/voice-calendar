@@ -89,9 +89,7 @@ class VoiceCalendarApp:
         self._post_processor = PostProcessor()
 
         # 热词管理
-        self._hotword_manager = HotwordManager(
-            hotword_file=str(self.config.hotword_file)
-        )
+        self._hotword_manager = HotwordManager(hotword_file=str(self.config.hotword_file))
 
         # 录音器
         self._recorder = AudioRecorder(
@@ -124,7 +122,8 @@ class VoiceCalendarApp:
         self._achievement_engine = AchievementEngine(
             self._stats_engine,
             save_path=str(self.config.data_dir / "achievements.json")
-            if hasattr(self.config, 'data_dir') else "achievements.json",
+            if hasattr(self.config, "data_dir")
+            else "achievements.json",
         )
 
         # 提醒调度器
@@ -144,9 +143,7 @@ class VoiceCalendarApp:
         logger.info("语音日历工具启动")
 
         # 加载 Whisper 模型（后台线程）
-        self._worker_thread = threading.Thread(
-            target=self._load_model_worker, daemon=True, name="ModelLoader"
-        )
+        self._worker_thread = threading.Thread(target=self._load_model_worker, daemon=True, name="ModelLoader")
         self._worker_thread.start()
 
         # 注册快捷键
@@ -210,8 +207,10 @@ class VoiceCalendarApp:
 
         # 在 worker 线程中执行识别+解析
         threading.Thread(
-            target=self._process_audio, args=(audio,),
-            daemon=True, name="SpeechWorker",
+            target=self._process_audio,
+            args=(audio,),
+            daemon=True,
+            name="SpeechWorker",
         ).start()
 
     def _on_record_cancel(self):
@@ -254,16 +253,12 @@ class VoiceCalendarApp:
             logger.info(f"指令解析: 识别到 {len(commands)} 条指令")
 
             if not commands:
-                self._result_queue.put(
-                    ("voice_state", VoiceState.ERROR, "未识别到有效指令")
-                )
+                self._result_queue.put(("voice_state", VoiceState.ERROR, "未识别到有效指令"))
                 return
 
             # 4. 逐条执行指令
             for cmd in commands:
-                logger.info(
-                    f"执行指令: type={cmd.command_type.value}, title='{cmd.title}'"
-                )
+                logger.info(f"执行指令: type={cmd.command_type.value}, title='{cmd.title}'")
                 self._execute_command(cmd)
 
         except Exception as e:
@@ -282,6 +277,7 @@ class VoiceCalendarApp:
         # 繁转简
         try:
             import zhconv
+
             text = zhconv.convert(text, "zh-cn")
         except ImportError:
             pass
@@ -317,14 +313,10 @@ class VoiceCalendarApp:
             self._execute_query_event(command)
         elif cmd_type == CommandType.UPDATE_EVENT:
             self._result_queue.put(
-                ("voice_state", VoiceState.SUCCESS,
-                 f"修改功能请通过界面操作: {command.original_text}")
+                ("voice_state", VoiceState.SUCCESS, f"修改功能请通过界面操作: {command.original_text}")
             )
         else:
-            self._result_queue.put(
-                ("voice_state", VoiceState.ERROR,
-                 f"无法理解指令: {command.original_text}")
-            )
+            self._result_queue.put(("voice_state", VoiceState.ERROR, f"无法理解指令: {command.original_text}"))
 
     def _execute_add_event(self, command):
         """执行添加事件"""
@@ -337,8 +329,8 @@ class VoiceCalendarApp:
         self._calendar.add_event(
             title=command.title,
             start_time=command.time,
-            priority=getattr(command, 'priority', 0),
-            recurrence_rule=getattr(command, 'recurrence_rule', ''),
+            priority=getattr(command, "priority", 0),
+            recurrence_rule=getattr(command, "recurrence_rule", ""),
         )
         time_str = command.time.strftime("%m月%d日 %H:%M")
         msg = f"已添加: {command.title} ({time_str})"
@@ -484,4 +476,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

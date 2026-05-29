@@ -65,18 +65,26 @@ class SettingsWindow(ctk.CTkToplevel):
         btn_frame.pack(fill="x", padx=10, pady=(0, 10))
 
         ctk.CTkButton(
-            btn_frame, text="保存", width=100,
+            btn_frame,
+            text="保存",
+            width=100,
             command=self._save_and_close,
         ).pack(side="right", padx=5)
 
         ctk.CTkButton(
-            btn_frame, text="取消", width=100,
-            fg_color="gray", command=self.destroy,
+            btn_frame,
+            text="取消",
+            width=100,
+            fg_color="gray",
+            command=self.destroy,
         ).pack(side="right", padx=5)
 
         ctk.CTkButton(
-            btn_frame, text="恢复默认", width=100,
-            fg_color="#e67e22", command=self._reset_settings,
+            btn_frame,
+            text="恢复默认",
+            width=100,
+            fg_color="#e67e22",
+            command=self._reset_settings,
         ).pack(side="left", padx=5)
 
     def _create_basic_tab(self):
@@ -88,7 +96,9 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="录音快捷键:").grid(row=0, column=0, sticky="w", **pad)
         self._hotkey_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._hotkey_var, width=200,
+            tab,
+            variable=self._hotkey_var,
+            width=200,
             values=["right alt", "right ctrl", "right shift", "f4", "f8", "f9"],
         ).grid(row=0, column=1, sticky="w", **pad)
 
@@ -96,7 +106,9 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="触发方式:").grid(row=1, column=0, sticky="w", **pad)
         self._mode_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._mode_var, width=200,
+            tab,
+            variable=self._mode_var,
+            width=200,
             values=["hold", "toggle"],
         ).grid(row=1, column=1, sticky="w", **pad)
 
@@ -104,7 +116,9 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="主题:").grid(row=2, column=0, sticky="w", **pad)
         self._theme_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._theme_var, width=200,
+            tab,
+            variable=self._theme_var,
+            width=200,
             values=["system", "light", "dark"],
             command=self._on_theme_changed,
         ).grid(row=2, column=1, sticky="w", **pad)
@@ -112,7 +126,9 @@ class SettingsWindow(ctk.CTkToplevel):
         # 通知
         self._notify_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
-            tab, text="显示系统通知", variable=self._notify_var,
+            tab,
+            text="显示系统通知",
+            variable=self._notify_var,
         ).grid(row=3, column=1, sticky="w", **pad)
 
     def _create_engine_tab(self):
@@ -124,7 +140,9 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="识别模型:").grid(row=0, column=0, sticky="w", **pad)
         self._model_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._model_var, width=200,
+            tab,
+            variable=self._model_var,
+            width=200,
             values=["tiny", "base", "small", "medium"],
         ).grid(row=0, column=1, sticky="w", **pad)
 
@@ -132,7 +150,9 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="计算精度:").grid(row=1, column=0, sticky="w", **pad)
         self._compute_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._compute_var, width=200,
+            tab,
+            variable=self._compute_var,
+            width=200,
             values=["int8", "float16", "float32"],
         ).grid(row=1, column=1, sticky="w", **pad)
 
@@ -140,14 +160,18 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="识别语言:").grid(row=2, column=0, sticky="w", **pad)
         self._lang_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._lang_var, width=200,
+            tab,
+            variable=self._lang_var,
+            width=200,
             values=["zh", "en", "ja"],
         ).grid(row=2, column=1, sticky="w", **pad)
 
         # 同音纠错
         self._correction_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
-            tab, text="启用同音纠错", variable=self._correction_var,
+            tab,
+            text="启用同音纠错",
+            variable=self._correction_var,
         ).grid(row=3, column=1, sticky="w", **pad)
 
     def _create_calendar_tab(self):
@@ -159,27 +183,35 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="默认提醒:").grid(row=0, column=0, sticky="w", **pad)
         self._reminder_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._reminder_var, width=200,
+            tab,
+            variable=self._reminder_var,
+            width=200,
             values=["5", "10", "15", "30", "60"],
         ).grid(row=0, column=1, sticky="w", **pad)
 
         # 提醒开关
         self._reminder_enabled_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
-            tab, text="启用事件提醒", variable=self._reminder_enabled_var,
+            tab,
+            text="启用事件提醒",
+            variable=self._reminder_enabled_var,
         ).grid(row=1, column=1, sticky="w", **pad)
 
         # 提醒声音
         self._reminder_sound_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
-            tab, text="提醒时播放声音", variable=self._reminder_sound_var,
+            tab,
+            text="提醒时播放声音",
+            variable=self._reminder_sound_var,
         ).grid(row=2, column=1, sticky="w", **pad)
 
         # 周起始日
         ctk.CTkLabel(tab, text="周起始日:").grid(row=3, column=0, sticky="w", **pad)
         self._week_start_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._week_start_var, width=200,
+            tab,
+            variable=self._week_start_var,
+            width=200,
             values=["周一", "周日"],
         ).grid(row=3, column=1, sticky="w", **pad)
 
@@ -191,14 +223,18 @@ class SettingsWindow(ctk.CTkToplevel):
         # LLM 开关
         self._llm_enabled_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
-            tab, text="启用 LLM 兜底解析", variable=self._llm_enabled_var,
+            tab,
+            text="启用 LLM 兜底解析",
+            variable=self._llm_enabled_var,
         ).grid(row=0, column=1, sticky="w", **pad)
 
         # 提供商
         ctk.CTkLabel(tab, text="LLM 提供商:").grid(row=1, column=0, sticky="w", **pad)
         self._llm_provider_var = ctk.StringVar()
         ctk.CTkComboBox(
-            tab, variable=self._llm_provider_var, width=200,
+            tab,
+            variable=self._llm_provider_var,
+            width=200,
             values=["ollama", "openai"],
         ).grid(row=1, column=1, sticky="w", **pad)
 
@@ -206,14 +242,18 @@ class SettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="模型名称:").grid(row=2, column=0, sticky="w", **pad)
         self._llm_model_var = ctk.StringVar()
         ctk.CTkEntry(
-            tab, variable=self._llm_model_var, width=200,
+            tab,
+            variable=self._llm_model_var,
+            width=200,
         ).grid(row=2, column=1, sticky="w", **pad)
 
         # API 地址
         ctk.CTkLabel(tab, text="API 地址:").grid(row=3, column=0, sticky="w", **pad)
         self._llm_url_var = ctk.StringVar()
         ctk.CTkEntry(
-            tab, variable=self._llm_url_var, width=200,
+            tab,
+            variable=self._llm_url_var,
+            width=200,
         ).grid(row=3, column=1, sticky="w", **pad)
 
     def _load_settings(self):

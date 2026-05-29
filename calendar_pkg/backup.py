@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from calendar_pkg.event import CalendarEvent
 from calendar_pkg.storage import SQLiteStorage
@@ -58,9 +58,7 @@ class CalendarBackup:
         logger.info(f"数据已导出: {path}, {len(events)} 条事件")
         return len(events)
 
-    def import_json(
-        self, path: str, mode: str = "merge"
-    ) -> dict:
+    def import_json(self, path: str, mode: str = "merge") -> dict:
         """从 JSON 文件恢复数据
 
         Args:
@@ -101,19 +99,14 @@ class CalendarBackup:
                 logger.warning(f"导入事件失败: {e}")
                 result["skipped"] += 1
 
-        logger.info(
-            f"数据导入完成: {path}, "
-            f"导入 {result['imported']} 条, 跳过 {result['skipped']} 条"
-        )
+        logger.info(f"数据导入完成: {path}, 导入 {result['imported']} 条, 跳过 {result['skipped']} 条")
         return result
 
     def _get_all_events(self) -> List[CalendarEvent]:
         """获取所有事件（包括已软删除的）"""
         conn = self._storage._get_connection()
         try:
-            cursor = conn.execute(
-                "SELECT * FROM events ORDER BY start_time ASC"
-            )
+            cursor = conn.execute("SELECT * FROM events ORDER BY start_time ASC")
             return [CalendarEvent.from_row(dict(row)) for row in cursor.fetchall()]
         finally:
             conn.close()

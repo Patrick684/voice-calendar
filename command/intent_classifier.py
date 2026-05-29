@@ -41,8 +41,7 @@ class IntentClassifier:
         self._model_path = Path(model_path)
         if not self._model_path.exists():
             raise FileNotFoundError(
-                f"模型目录不存在: {model_path}。请先运行 "
-                f"scripts/train_intent_classifier.py 训练模型。"
+                f"模型目录不存在: {model_path}。请先运行 scripts/train_intent_classifier.py 训练模型。"
             )
 
         # 自动选择设备
@@ -65,10 +64,7 @@ class IntentClassifier:
         self._model.to(self._device)
         self._model.eval()
 
-        logger.info(
-            f"意图分类器加载完成: {len(self._label_names)} 类别, "
-            f"device={self._device}"
-        )
+        logger.info(f"意图分类器加载完成: {len(self._label_names)} 类别, device={self._device}")
 
     def predict(self, text: str, max_length: int = 48) -> tuple[str, float]:
         """预测文本意图
@@ -105,9 +101,7 @@ class IntentClassifier:
         label = self._label_names[pred_idx]
         return label, confidence
 
-    def predict_batch(
-        self, texts: list[str], max_length: int = 48
-    ) -> list[tuple[str, float]]:
+    def predict_batch(self, texts: list[str], max_length: int = 48) -> list[tuple[str, float]]:
         """批量预测（用于测试/评估）
 
         Args:

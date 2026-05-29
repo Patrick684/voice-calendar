@@ -1,9 +1,12 @@
 """Check GPU and PyTorch CUDA availability"""
+
 import sys
-sys.stdout.reconfigure(encoding='utf-8')
+
+sys.stdout.reconfigure(encoding="utf-8")
 
 try:
     import torch
+
     print(f"PyTorch version: {torch.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
@@ -26,6 +29,7 @@ except ImportError:
 
 try:
     import transformers
+
     print(f"\nTransformers version: {transformers.__version__}")
 except ImportError:
     print("\nTransformers is NOT installed.")
@@ -33,6 +37,7 @@ except ImportError:
 
 try:
     import datasets
+
     print(f"Datasets version: {datasets.__version__}")
 except ImportError:
     print("Datasets is NOT installed.")

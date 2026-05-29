@@ -3,7 +3,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List
 
 from calendar_pkg.stats import StatsEngine
 
@@ -115,6 +115,7 @@ class AchievementEngine:
                 json.dump(self._unlocked, f, ensure_ascii=False, indent=2)
         except IOError as e:
             import logging
+
             logging.getLogger(__name__).error(f"保存成就失败: {e}")
 
     def check_achievements(self) -> List[Dict]:
@@ -136,13 +137,15 @@ class AchievementEngine:
                 if rule["check"](self._stats, total_events):
                     unlock_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     self._unlocked[aid] = unlock_time
-                    newly_unlocked.append({
-                        "id": aid,
-                        "name": rule["name"],
-                        "description": rule["description"],
-                        "icon": rule["icon"],
-                        "unlocked_at": unlock_time,
-                    })
+                    newly_unlocked.append(
+                        {
+                            "id": aid,
+                            "name": rule["name"],
+                            "description": rule["description"],
+                            "icon": rule["icon"],
+                            "unlocked_at": unlock_time,
+                        }
+                    )
             except Exception:
                 continue
 
@@ -161,14 +164,16 @@ class AchievementEngine:
         for rule in ACHIEVEMENT_RULES:
             aid = rule["id"]
             unlocked = aid in self._unlocked
-            result.append({
-                "id": aid,
-                "name": rule["name"],
-                "description": rule["description"],
-                "icon": rule["icon"],
-                "unlocked": unlocked,
-                "unlocked_at": self._unlocked.get(aid, ""),
-            })
+            result.append(
+                {
+                    "id": aid,
+                    "name": rule["name"],
+                    "description": rule["description"],
+                    "icon": rule["icon"],
+                    "unlocked": unlocked,
+                    "unlocked_at": self._unlocked.get(aid, ""),
+                }
+            )
         return result
 
     def get_unlocked_count(self) -> int:

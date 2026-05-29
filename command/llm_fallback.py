@@ -103,18 +103,21 @@ class LLMFallback:
     def _call_ollama(self, system_msg: str, user_msg: str) -> Optional[str]:
         """调用 Ollama API"""
         url = f"{self._base_url}/api/chat"
-        payload = json.dumps({
-            "model": self._model,
-            "messages": [
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            "stream": False,
-            "options": {"temperature": 0.1},
-        }).encode("utf-8")
+        payload = json.dumps(
+            {
+                "model": self._model,
+                "messages": [
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                "stream": False,
+                "options": {"temperature": 0.1},
+            }
+        ).encode("utf-8")
 
         req = request.Request(
-            url, data=payload,
+            url,
+            data=payload,
             headers={"Content-Type": "application/json"},
         )
 
@@ -129,17 +132,20 @@ class LLMFallback:
     def _call_openai(self, system_msg: str, user_msg: str) -> Optional[str]:
         """调用 OpenAI 兼容 API"""
         url = f"{self._base_url}/v1/chat/completions"
-        payload = json.dumps({
-            "model": self._model,
-            "messages": [
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            "temperature": 0.1,
-        }).encode("utf-8")
+        payload = json.dumps(
+            {
+                "model": self._model,
+                "messages": [
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                "temperature": 0.1,
+            }
+        ).encode("utf-8")
 
         req = request.Request(
-            url, data=payload,
+            url,
+            data=payload,
             headers={"Content-Type": "application/json"},
         )
 
@@ -151,9 +157,7 @@ class LLMFallback:
             logger.warning(f"OpenAI API 调用失败: {e}")
             return None
 
-    def _parse_response(
-        self, response: str, original_text: str
-    ) -> Optional[ParsedCommand]:
+    def _parse_response(self, response: str, original_text: str) -> Optional[ParsedCommand]:
         """解析 LLM 返回的 JSON
 
         Args:

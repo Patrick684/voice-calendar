@@ -18,14 +18,14 @@ class TimeDial(ctk.CTkFrame):
     """
 
     # 布局常量
-    _SLOT_WIDTH = 28       # 每个半小时的像素宽度
-    _TOTAL_SLOTS = 48      # 24h × 2 = 48 个半小时
-    _HEIGHT = 80           # 组件总高度
-    _TICK_TOP = 25         # 刻度线顶部 Y
-    _HANDLE_Y = 20         # 滑块中心 Y
-    _HANDLE_W = 12         # 滑块宽度
-    _HANDLE_H = 30         # 滑块高度
-    _LABEL_Y = 55          # 小时标签 Y
+    _SLOT_WIDTH = 28  # 每个半小时的像素宽度
+    _TOTAL_SLOTS = 48  # 24h × 2 = 48 个半小时
+    _HEIGHT = 80  # 组件总高度
+    _TICK_TOP = 25  # 刻度线顶部 Y
+    _HANDLE_Y = 20  # 滑块中心 Y
+    _HANDLE_W = 12  # 滑块宽度
+    _HANDLE_H = 30  # 滑块高度
+    _LABEL_Y = 55  # 小时标签 Y
 
     def __init__(
         self,
@@ -80,8 +80,12 @@ class TimeDial(ctk.CTkFrame):
         # 背景渐变效果（工作时间浅色高亮）
         # 工作时间 8:00-18:00 (slot 16-36)
         c.create_rectangle(
-            16 * sw, 0, 36 * sw, self._HEIGHT,
-            fill="#e8f5e9", outline="",
+            16 * sw,
+            0,
+            36 * sw,
+            self._HEIGHT,
+            fill="#e8f5e9",
+            outline="",
         )
 
         # 刻度线
@@ -89,20 +93,20 @@ class TimeDial(ctk.CTkFrame):
             x = i * sw
             if i % 2 == 0:
                 # 整点：长刻度
-                c.create_line(x, self._TICK_TOP, x, self._TICK_TOP + 15,
-                              fill="#666", width=2)
+                c.create_line(x, self._TICK_TOP, x, self._TICK_TOP + 15, fill="#666", width=2)
             else:
                 # 半点：短刻度
-                c.create_line(x, self._TICK_TOP + 5, x, self._TICK_TOP + 15,
-                              fill="#aaa", width=1)
+                c.create_line(x, self._TICK_TOP + 5, x, self._TICK_TOP + 15, fill="#aaa", width=1)
 
         # 小时标签
         for h in range(24):
             x = h * 2 * sw
             label = f"{h:02d}"
             c.create_text(
-                x + sw, self._LABEL_Y,
-                text=label, fill="#555",
+                x + sw,
+                self._LABEL_Y,
+                text=label,
+                fill="#555",
                 font=("Consolas", 9),
             )
 
@@ -110,9 +114,13 @@ class TimeDial(ctk.CTkFrame):
         if 0 <= self._hover_slot < self._TOTAL_SLOTS and not self._dragging:
             hx = self._hover_slot * sw
             c.create_rectangle(
-                hx, self._TICK_TOP - 5,
-                hx + sw, self._TICK_TOP + 20,
-                fill="#bbdefb", outline="", stipple="gray25",
+                hx,
+                self._TICK_TOP - 5,
+                hx + sw,
+                self._TICK_TOP + 20,
+                fill="#bbdefb",
+                outline="",
+                stipple="gray25",
             )
 
         # 滑块
@@ -120,9 +128,13 @@ class TimeDial(ctk.CTkFrame):
         sx = slot * sw
         # 滑块主体
         c.create_rectangle(
-            sx - self._HANDLE_W // 2, self._HANDLE_Y,
-            sx + self._HANDLE_W // 2, self._HANDLE_Y + self._HANDLE_H,
-            fill="#1976D2", outline="#0D47A1", width=2,
+            sx - self._HANDLE_W // 2,
+            self._HANDLE_Y,
+            sx + self._HANDLE_W // 2,
+            self._HANDLE_Y + self._HANDLE_H,
+            fill="#1976D2",
+            outline="#0D47A1",
+            width=2,
             tags="handle",
         )
         # 滑块上方时间标签
@@ -130,8 +142,10 @@ class TimeDial(ctk.CTkFrame):
         minute = (slot % 2) * 30
         time_text = f"{hour:02d}:{minute:02d}"
         c.create_text(
-            sx, self._HANDLE_Y - 8,
-            text=time_text, fill="#1976D2",
+            sx,
+            self._HANDLE_Y - 8,
+            text=time_text,
+            fill="#1976D2",
             font=("Consolas", 10, "bold"),
             tags="handle_label",
         )

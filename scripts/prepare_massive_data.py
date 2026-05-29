@@ -78,10 +78,37 @@ UPDATE_TEMPLATES = [
     "将{event}改为{time}",
 ]
 
-EVENT_WORDS = ["会议", "约会", "聚餐", "面试", "考试", "开会", "上课", "培训",
-               "运动", "健身", "看牙", "理发", "出差", "报告", "答辩"]
-TIME_WORDS = ["明天", "后天", "下周一", "下午三点", "上午十点", "晚上八点",
-              "三点半", "五点", "九点", "中午十二点", "早上七点", "傍晚六点"]
+EVENT_WORDS = [
+    "会议",
+    "约会",
+    "聚餐",
+    "面试",
+    "考试",
+    "开会",
+    "上课",
+    "培训",
+    "运动",
+    "健身",
+    "看牙",
+    "理发",
+    "出差",
+    "报告",
+    "答辩",
+]
+TIME_WORDS = [
+    "明天",
+    "后天",
+    "下周一",
+    "下午三点",
+    "上午十点",
+    "晚上八点",
+    "三点半",
+    "五点",
+    "九点",
+    "中午十二点",
+    "早上七点",
+    "傍晚六点",
+]
 
 
 def load_massive_zh_cn(path: str) -> list[dict]:
@@ -125,13 +152,15 @@ def augment_with_fillers(text: str) -> str:
 def augment_colloquial(text: str) -> str:
     """语音口语化增强：模拟 Whisper 转写特征"""
     augmented = text
-    action = random.choice([
-        "add_prefix",       # 口语前缀：哎/那个/帮我一下
-        "slight_repeat",    # 轻微重复：明天明天下午开会
-        "ultra_short",      # 极简短句（去修饰词）
-        "add_filler",       # 插入语气词：嗯/呃
-        "noop",
-    ])
+    action = random.choice(
+        [
+            "add_prefix",  # 口语前缀：哎/那个/帮我一下
+            "slight_repeat",  # 轻微重复：明天明天下午开会
+            "ultra_short",  # 极简短句（去修饰词）
+            "add_filler",  # 插入语气词：嗯/呃
+            "noop",
+        ]
+    )
     if action == "add_prefix":
         prefix = random.choice(COLLOQUIAL_PREFIX)
         augmented = prefix + augmented
@@ -164,8 +193,7 @@ def generate_update_events(count: int) -> list[dict]:
     return samples
 
 
-def augment_class(data: list[dict], target_label: str, target_count: int,
-                  use_colloquial: bool = False) -> list[dict]:
+def augment_class(data: list[dict], target_label: str, target_count: int, use_colloquial: bool = False) -> list[dict]:
     """对小类进行增强至目标数量
 
     Args:
@@ -204,8 +232,8 @@ def stratified_split(data: list[dict], train_ratio=0.8, dev_ratio=0.1, test_rati
         n_train = int(n * train_ratio)
         n_dev = int(n * dev_ratio)
         train.extend(items[:n_train])
-        dev.extend(items[n_train:n_train + n_dev])
-        test.extend(items[n_train + n_dev:])
+        dev.extend(items[n_train : n_train + n_dev])
+        test.extend(items[n_train + n_dev :])
 
     random.shuffle(train)
     random.shuffle(dev)

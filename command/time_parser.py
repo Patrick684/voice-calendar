@@ -39,30 +39,51 @@ class TimeParser:
 
     # 中文数字到阿拉伯数字映射
     CN_NUM = {
-        "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
-        "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
-        "十一": 11, "十二": 12,
+        "零": 0,
+        "一": 1,
+        "二": 2,
+        "两": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "七": 7,
+        "八": 8,
+        "九": 9,
+        "十": 10,
+        "十一": 11,
+        "十二": 12,
     }
 
     # 星期映射
     WEEKDAY_MAP = {
-        "一": 0, "二": 1, "三": 2, "四": 3,
-        "五": 4, "六": 5, "日": 6, "天": 6,
+        "一": 0,
+        "二": 1,
+        "三": 2,
+        "四": 3,
+        "五": 4,
+        "六": 5,
+        "日": 6,
+        "天": 6,
     }
 
     # 时段默认时间映射
     PERIOD_DEFAULTS = {
-        "早上": 8, "早晨": 8, "上午": 9,
-        "中午": 12, "下午": 14, "傍晚": 17,
-        "晚上": 19, "晚间": 20, "凌晨": 2,
+        "早上": 8,
+        "早晨": 8,
+        "上午": 9,
+        "中午": 12,
+        "下午": 14,
+        "傍晚": 17,
+        "晚上": 19,
+        "晚间": 20,
+        "凌晨": 2,
     }
 
     # 时段对 12 小时制的影响
     PERIOD_PM_OFFSET = {"下午", "晚上", "晚间", "傍晚"}
 
-    def parse(
-        self, text: str, base_date: Optional[datetime] = None
-    ) -> Tuple[Optional[datetime], str]:
+    def parse(self, text: str, base_date: Optional[datetime] = None) -> Tuple[Optional[datetime], str]:
         """解析文本中的时间表达式
 
         Args:
@@ -113,17 +134,13 @@ class TimeParser:
             if period_result in self.PERIOD_PM_OFFSET and hour < 12:
                 hour += 12
             if result_time is None:
-                result_time = ref.replace(
-                    hour=hour, minute=minute, second=0, microsecond=0
-                )
+                result_time = ref.replace(hour=hour, minute=minute, second=0, microsecond=0)
             else:
                 result_time = result_time.replace(hour=hour, minute=minute, second=0)
         elif period_hour is not None:
             # 只有时段没有具体时间，使用时段默认值
             if result_time is None:
-                result_time = ref.replace(
-                    hour=period_hour, minute=0, second=0, microsecond=0
-                )
+                result_time = ref.replace(hour=period_hour, minute=0, second=0, microsecond=0)
             else:
                 result_time = result_time.replace(hour=period_hour, minute=0, second=0)
 
@@ -131,9 +148,7 @@ class TimeParser:
         remaining = remaining.strip()
         return result_time, remaining
 
-    def _parse_relative_date(
-        self, text: str, base_date: datetime
-    ) -> Tuple[Optional[datetime], str]:
+    def _parse_relative_date(self, text: str, base_date: datetime) -> Tuple[Optional[datetime], str]:
         """解析相对日期：今天/明天/后天/大后天/昨天/前天/N天后/N天前"""
         patterns = [
             (r"大后天", 3),
@@ -150,7 +165,7 @@ class TimeParser:
             match = re.search(pattern, text)
             if match:
                 matched_text = match.group()
-                remaining = text[:match.start()] + text[match.end():]
+                remaining = text[: match.start()] + text[match.end() :]
 
                 if days is not None:
                     return base_date + timedelta(days=days), remaining
@@ -167,32 +182,30 @@ class TimeParser:
         match = re.search(r"(\d+|[一二两三四五六七八九十]+)\s*天后", text)
         if match:
             n = self._cn_to_int(match.group(1))
-            remaining = text[:match.start()] + text[match.end():]
+            remaining = text[: match.start()] + text[match.end() :]
             return base_date + timedelta(days=n), remaining
 
         match = re.search(r"(\d+|[一二两三四五六七八九十]+)\s*天前", text)
         if match:
             n = self._cn_to_int(match.group(1))
-            remaining = text[:match.start()] + text[match.end():]
+            remaining = text[: match.start()] + text[match.end() :]
             return base_date - timedelta(days=n), remaining
 
         match = re.search(r"(\d+|[一二两三四五六七八九十]+)\s*小时后", text)
         if match:
             n = self._cn_to_int(match.group(1))
-            remaining = text[:match.start()] + text[match.end():]
+            remaining = text[: match.start()] + text[match.end() :]
             return datetime.now() + timedelta(hours=n), remaining
 
         match = re.search(r"(\d+|[一二两三四五六七八九十]+)\s*分钟后", text)
         if match:
             n = self._cn_to_int(match.group(1))
-            remaining = text[:match.start()] + text[match.end():]
+            remaining = text[: match.start()] + text[match.end() :]
             return datetime.now() + timedelta(minutes=n), remaining
 
         return None, text
 
-    def _parse_next_weekday(
-        self, text: str, now: datetime
-    ) -> Tuple[Optional[datetime], str]:
+    def _parse_next_weekday(self, text: str, now: datetime) -> Tuple[Optional[datetime], str]:
         """解析 下周X / 上周X / 周X"""
         # 上周X / 上星期X（过去）
         match = re.search(r"上(周|星期)([一二三四五六日天])", text)
@@ -202,10 +215,8 @@ class TimeParser:
             days_back = (current_weekday - target_weekday) % 7
             if days_back == 0:
                 days_back = 7
-            result = now.replace(
-                hour=9, minute=0, second=0, microsecond=0
-            ) - timedelta(days=days_back)
-            remaining = text[:match.start()] + text[match.end():]
+            result = now.replace(hour=9, minute=0, second=0, microsecond=0) - timedelta(days=days_back)
+            remaining = text[: match.start()] + text[match.end() :]
             return result, remaining
 
         match = re.search(r"下(周|星期)([一二三四五六日天])", text)
@@ -216,10 +227,8 @@ class TimeParser:
             days_ahead = (target_weekday - current_weekday) % 7
             if days_ahead == 0:
                 days_ahead = 7  # 下周日如果是周日则加 7 天
-            result = now.replace(
-                hour=9, minute=0, second=0, microsecond=0
-            ) + timedelta(days=days_ahead)
-            remaining = text[:match.start()] + text[match.end():]
+            result = now.replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=days_ahead)
+            remaining = text[: match.start()] + text[match.end() :]
             return result, remaining
 
         # 周X / 星期X（本周或最近的）
@@ -228,17 +237,13 @@ class TimeParser:
             target_weekday = self.WEEKDAY_MAP[match.group(1)]
             current_weekday = now.weekday()
             days_ahead = (target_weekday - current_weekday) % 7
-            result = now.replace(
-                hour=9, minute=0, second=0, microsecond=0
-            ) + timedelta(days=days_ahead)
-            remaining = text[:match.start()] + text[match.end():]
+            result = now.replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=days_ahead)
+            remaining = text[: match.start()] + text[match.end() :]
             return result, remaining
 
         return None, text
 
-    def _parse_month_day(
-        self, text: str, now: datetime
-    ) -> Tuple[Optional[datetime], str]:
+    def _parse_month_day(self, text: str, now: datetime) -> Tuple[Optional[datetime], str]:
         """解析 X月X号 / X月X日 / X号"""
         # X月X号/日
         match = re.search(
@@ -254,7 +259,7 @@ class TimeParser:
                 # 如果日期已过，推到明年
                 if result < now:
                     result = result.replace(year=year + 1)
-                remaining = text[:match.start()] + text[match.end():]
+                remaining = text[: match.start()] + text[match.end() :]
                 return result, remaining
             except ValueError:
                 pass
@@ -271,7 +276,7 @@ class TimeParser:
                         result = result.replace(year=now.year + 1, month=1)
                     else:
                         result = result.replace(month=now.month + 1)
-                remaining = text[:match.start()] + text[match.end():]
+                remaining = text[: match.start()] + text[match.end() :]
                 return result, remaining
             except ValueError:
                 pass
@@ -295,7 +300,7 @@ class TimeParser:
             hour = int(match.group(1))
             minute = int(match.group(2))
             if 0 <= hour <= 23 and 0 <= minute <= 59:
-                remaining = text[:match.start()] + text[match.end():]
+                remaining = text[: match.start()] + text[match.end() :]
                 return (hour, minute), remaining
 
         # 数字时间: HH点/MM:00
@@ -303,13 +308,11 @@ class TimeParser:
         if match:
             hour = int(match.group(1))
             if 0 <= hour <= 23:
-                remaining = text[:match.start()] + text[match.end():]
+                remaining = text[: match.start()] + text[match.end() :]
                 return (hour, 0), remaining
 
         # 中文时间: 三点/三点半/三点十五
-        match = re.search(
-            r"([一二两三四五六七八九十]+)\s*点\s*(半|十五|三十|四十五)?", text
-        )
+        match = re.search(r"([一二两三四五六七八九十]+)\s*点\s*(半|十五|三十|四十五)?", text)
         if match:
             hour = self._cn_to_int(match.group(1))
             minute = 0
@@ -317,7 +320,7 @@ class TimeParser:
                 minute_map = {"半": 30, "十五": 15, "三十": 30, "四十五": 45}
                 minute = minute_map.get(match.group(2), 0)
             if 1 <= hour <= 12:
-                remaining = text[:match.start()] + text[match.end():]
+                remaining = text[: match.start()] + text[match.end() :]
                 return (hour, minute), remaining
 
         # HH:MM 纯数字格式
@@ -326,7 +329,7 @@ class TimeParser:
             hour = int(match.group(1))
             minute = int(match.group(2))
             if 0 <= hour <= 23 and 0 <= minute <= 59:
-                remaining = text[:match.start()] + text[match.end():]
+                remaining = text[: match.start()] + text[match.end() :]
                 return (hour, minute), remaining
 
         return None, text
@@ -369,7 +372,7 @@ class TimeParser:
                 klen = len(keyword)
                 if pos + klen > len(corrected):
                     continue
-                candidate = corrected[pos:pos + klen]
+                candidate = corrected[pos : pos + klen]
                 # 如果已经是正确关键词，跳过
                 if candidate == keyword:
                     break  # 当前位置已匹配，跳到下一个位置
@@ -386,7 +389,7 @@ class TimeParser:
                 norm_kw = [cls._normalize_pinyin(p) for p in kw_pinyin]
                 if norm_cand == norm_kw:
                     logger.info(f"近音纠错: '{candidate}' -> '{keyword}'")
-                    corrected = corrected[:pos] + keyword + corrected[pos + klen:]
+                    corrected = corrected[:pos] + keyword + corrected[pos + klen :]
                     break  # 当前位置已纠正
 
         return corrected
@@ -395,25 +398,54 @@ class TimeParser:
     # 第一级：声母混淆（翘舌/平舌、n/l）
     _PINYIN_INITIAL_NORM = {
         # 翘舌/平舌不分
-        "shi": "si", "zhi": "zi", "chi": "ci",
-        "shang": "sang", "zhang": "zang", "chang": "cang",
-        "shu": "su", "zhu": "zu", "chu": "cu",
-        "shen": "sen", "zhen": "zen",
+        "shi": "si",
+        "zhi": "zi",
+        "chi": "ci",
+        "shang": "sang",
+        "zhang": "zang",
+        "chang": "cang",
+        "shu": "su",
+        "zhu": "zu",
+        "chu": "cu",
+        "shen": "sen",
+        "zhen": "zen",
         # n/l 不分
-        "nan": "lan", "niu": "liu", "nong": "long",
-        "nu": "lu", "nv": "lv", "nuan": "luan",
-        "ne": "le", "nai": "lai", "nao": "lao",
-        "nen": "len", "nang": "lang", "ning": "ling",
+        "nan": "lan",
+        "niu": "liu",
+        "nong": "long",
+        "nu": "lu",
+        "nv": "lv",
+        "nuan": "luan",
+        "ne": "le",
+        "nai": "lai",
+        "nao": "lao",
+        "nen": "len",
+        "nang": "lang",
+        "ning": "ling",
     }
     # 第二级：韵母混淆（前鼻音/后鼻音）
     _PINYIN_FINAL_NORM = {
-        "yin": "ying", "jin": "jing", "xin": "xing",
-        "lin": "ling", "min": "ming", "bin": "bing",
-        "pin": "ping", "qin": "qing", "tin": "ting",
-        "nin": "ning", "zhen": "zheng", "chen": "cheng",
-        "shen": "sheng", "fen": "feng", "ben": "beng",
-        "pen": "peng", "men": "meng", "gen": "geng",
-        "ken": "keng", "hen": "heng", "wen": "weng",
+        "yin": "ying",
+        "jin": "jing",
+        "xin": "xing",
+        "lin": "ling",
+        "min": "ming",
+        "bin": "bing",
+        "pin": "ping",
+        "qin": "qing",
+        "tin": "ting",
+        "nin": "ning",
+        "zhen": "zheng",
+        "chen": "cheng",
+        "shen": "sheng",
+        "fen": "feng",
+        "ben": "beng",
+        "pen": "peng",
+        "men": "meng",
+        "gen": "geng",
+        "ken": "keng",
+        "hen": "heng",
+        "wen": "weng",
     }
 
     @classmethod

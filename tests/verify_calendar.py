@@ -128,9 +128,7 @@ def test_calendar_manager():
         now = datetime.now().replace(second=0, microsecond=0)
 
         # 1. 添加事件
-        event = manager.add_event(
-            title="团队会议", start_time=now + timedelta(hours=1)
-        )
+        event = manager.add_event(title="团队会议", start_time=now + timedelta(hours=1))
         assert event.id is not None
         assert event.reminder_minutes == 15
         print(f"  [通过] 添加事件: {event}")
@@ -141,9 +139,7 @@ def test_calendar_manager():
         print(f"  [通过] 今日事件: {len(today_events)} 条")
 
         # 3. 获取未来事件
-        future_event = manager.add_event(
-            title="下周计划", start_time=now + timedelta(days=3)
-        )
+        future_event = manager.add_event(title="下周计划", start_time=now + timedelta(days=3))
         upcoming = manager.get_upcoming_events(days=7)
         assert len(upcoming) >= 2
         print(f"  [通过] 未来事件: {len(upcoming)} 条")
@@ -189,5 +185,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n测试失败: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

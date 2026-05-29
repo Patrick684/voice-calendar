@@ -7,11 +7,12 @@ from typing import Optional, Callable
 
 class VoiceState(Enum):
     """语音输入状态"""
-    IDLE = "idle"           # 就绪
+
+    IDLE = "idle"  # 就绪
     RECORDING = "recording"  # 录音中
     PROCESSING = "processing"  # 识别中
-    SUCCESS = "success"     # 识别完成
-    ERROR = "error"         # 识别失败
+    SUCCESS = "success"  # 识别完成
+    ERROR = "error"  # 识别失败
 
 
 class VoicePanel(ctk.CTkFrame):
@@ -118,9 +119,7 @@ class VoicePanel(ctk.CTkFrame):
         elif state == VoiceState.PROCESSING:
             self._result_label.configure(text="正在识别语音...", text_color="gray")
         else:
-            self._result_label.configure(
-                text="按住快捷键或点击按钮开始语音输入", text_color="gray"
-            )
+            self._result_label.configure(text="按住快捷键或点击按钮开始语音输入", text_color="gray")
 
     def set_result(self, text: str):
         """设置识别结果文本

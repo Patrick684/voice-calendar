@@ -34,7 +34,10 @@ class CalendarEvent:
     PRIORITY_CRITICAL = 3
 
     PRIORITY_LABELS = {
-        0: "普通", 1: "重要", 2: "紧急", 3: "紧急且重要",
+        0: "普通",
+        1: "重要",
+        2: "紧急",
+        3: "紧急且重要",
     }
 
     title: str

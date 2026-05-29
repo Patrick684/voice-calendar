@@ -79,9 +79,7 @@ class SQLiteStorage:
 
     def _migrate(self, conn: sqlite3.Connection):
         """执行增量 schema 迁移"""
-        cursor = conn.execute(
-            "SELECT value FROM metadata WHERE key = 'schema_version'"
-        )
+        cursor = conn.execute("SELECT value FROM metadata WHERE key = 'schema_version'")
         row = cursor.fetchone()
         current_version = int(row["value"]) if row else 0
 
@@ -206,9 +204,7 @@ class SQLiteStorage:
 
         conn = self._get_connection()
         try:
-            cursor = conn.execute(
-                f"UPDATE events SET {set_clause} WHERE id = ?", values
-            )
+            cursor = conn.execute(f"UPDATE events SET {set_clause} WHERE id = ?", values)
             conn.commit()
             updated = cursor.rowcount > 0
             if updated:
@@ -275,9 +271,7 @@ class SQLiteStorage:
         """
         conn = self._get_connection()
         try:
-            cursor = conn.execute(
-                "SELECT * FROM events WHERE id = ?", (event_id,)
-            )
+            cursor = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,))
             row = cursor.fetchone()
             if row:
                 return CalendarEvent.from_row(dict(row))
@@ -285,9 +279,7 @@ class SQLiteStorage:
         finally:
             conn.close()
 
-    def get_events_by_range(
-        self, start: datetime, end: datetime
-    ) -> List[CalendarEvent]:
+    def get_events_by_range(self, start: datetime, end: datetime) -> List[CalendarEvent]:
         """查询时间范围内的事件（排除已删除）
 
         Args:
@@ -338,9 +330,7 @@ class SQLiteStorage:
         finally:
             conn.close()
 
-    def get_upcoming_events(
-        self, from_time: datetime, minutes_ahead: int
-    ) -> List[CalendarEvent]:
+    def get_upcoming_events(self, from_time: datetime, minutes_ahead: int) -> List[CalendarEvent]:
         """获取即将发生的事件（用于提醒调度）
 
         Args:
@@ -352,9 +342,8 @@ class SQLiteStorage:
         """
         from_str = from_time.isoformat(timespec="seconds")
         from datetime import timedelta
-        ahead_str = (from_time + timedelta(minutes=minutes_ahead)).isoformat(
-            timespec="seconds"
-        )
+
+        ahead_str = (from_time + timedelta(minutes=minutes_ahead)).isoformat(timespec="seconds")
 
         conn = self._get_connection()
         try:
@@ -468,6 +457,7 @@ class SQLiteStorage:
             被彻底删除的事件数量
         """
         from datetime import timedelta
+
         cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
         conn = self._get_connection()
         try:
@@ -482,4 +472,3 @@ class SQLiteStorage:
             return count
         finally:
             conn.close()
-

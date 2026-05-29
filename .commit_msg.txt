@@ -1,22 +1,12 @@
-feat: 拖拽改为左键+阈值 + 时间拨盘精调
+style: ruff check --fix + ruff format 全量修复
 
 ## 功能描述
-重构拖拽交互模式，结合两种时间调整方式：
-- 左键拖拽跨日期：按下后移动超过5px阈值进入拖拽模式，拖到目标日期格子释放即移动
-- 左键轻点打开编辑：未超过阈值的点击直接打开事件编辑对话框
-- 时间拨盘（TimeDial）：24h水平标尺+半小时吸附，选中事件后底部展开
-- 点击事件卡片左侧颜色条选中事件，拨盘显示当前时间位置
-- 拨盘拖拽调整时间，实时更新事件 start_time
-- 工作时间段(8:00-18:00)背景高亮
+- ruff check --fix: 修复 17 个 lint 错误（8×F541 f-string无占位符, 7×F401 未使用导入, 2×W293 空行含空白）
+- ruff format: 32 个文件格式化（缩进、引号、空行规范化）
 
 ## 实现思路
-- main_window.py: 重写拖拽为 ButtonPress-1 + B1-Motion + ButtonRelease-1 + 5px阈值
-  - _on_press 记录起始位置，_on_motion 检测阈值后进入拖拽
-  - _on_release 判断：拖拽模式→已由 _on_drag_drop 处理；点击模式→打开编辑对话框
-- time_dial.py: Canvas 自绘水平时间标尺，48个半小时刻度槽
-  - 工作时间区域(16-36 slot)绿色背景高亮
-  - 悬停高亮 + 拖拽滑块 + 实时时间标签
-  - set_event/clear 接口与事件列表联动
+使用项目 pyproject.toml 中的 ruff 配置（line-length=120, select=E/F/W, ignore=E501）
+执行 .venv\Scripts\python.exe -m ruff check --fix 和 ruff format
 
 ## 测试方法
 .venv\Scripts\python.exe tests/verify_command.py 全部通过

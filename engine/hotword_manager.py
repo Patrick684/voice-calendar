@@ -118,16 +118,49 @@ class HotwordManager:
             "抓手",
         ],
         "日历日程": [
-            "日程", "行程", "安排", "待办", "会议",
-            "提醒", "备忘录", "日程表", "日历",
-            "上午", "下午", "晚上", "明天", "后天",
-            "下周", "预约", "面试", "复试", "评审",
-            "团队会议", "项目评审", "周会", "月会",
-            "年会", "培训", "汇报", "答辩",
-            "体检", "复诊", "看牙", "拿药",
-            "航班", "高铁", "火车", "飞机",
-            "生日", "纪念日", "周年", "庆祝",
-            "截止", "截稿", "提交", "交付",
+            "日程",
+            "行程",
+            "安排",
+            "待办",
+            "会议",
+            "提醒",
+            "备忘录",
+            "日程表",
+            "日历",
+            "上午",
+            "下午",
+            "晚上",
+            "明天",
+            "后天",
+            "下周",
+            "预约",
+            "面试",
+            "复试",
+            "评审",
+            "团队会议",
+            "项目评审",
+            "周会",
+            "月会",
+            "年会",
+            "培训",
+            "汇报",
+            "答辩",
+            "体检",
+            "复诊",
+            "看牙",
+            "拿药",
+            "航班",
+            "高铁",
+            "火车",
+            "飞机",
+            "生日",
+            "纪念日",
+            "周年",
+            "庆祝",
+            "截止",
+            "截稿",
+            "提交",
+            "交付",
         ],
     }
 
@@ -161,9 +194,7 @@ class HotwordManager:
 
             self._global_hotwords = data.get("global_hotwords", [])
             self._active_categories = data.get("active_categories", [])
-            self._active_builtin = data.get(
-                "active_builtin", list(self.BUILTIN_DEFAULT_ACTIVE)
-            )
+            self._active_builtin = data.get("active_builtin", list(self.BUILTIN_DEFAULT_ACTIVE))
 
             for cat_data in data.get("categories", []):
                 cat = HotwordCategory.from_dict(cat_data)
@@ -331,9 +362,7 @@ class HotwordManager:
         "日常办公": "办公职场",
     }
 
-    def build_initial_prompt(
-        self, weight: float = 1.5, max_words: int = 30
-    ) -> Optional[str]:
+    def build_initial_prompt(self, weight: float = 1.5, max_words: int = 30) -> Optional[str]:
         """
         构建 Whisper 的 initial_prompt 字符串
 
@@ -404,9 +433,7 @@ class HotwordManager:
         if format == "json":
             data = {
                 "global_hotwords": self._global_hotwords,
-                "categories": {
-                    name: cat.hotwords for name, cat in self._categories.items()
-                },
+                "categories": {name: cat.hotwords for name, cat in self._categories.items()},
             }
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)

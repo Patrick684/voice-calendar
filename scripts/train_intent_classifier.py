@@ -34,12 +34,12 @@ from sklearn.metrics import (
 MODEL_NAME = "chinese-roberta-wwm-ext"  # 本地目录（由 download.py 下载）
 DATA_DIR = Path("data/intent")
 OUTPUT_DIR = Path("models/intent_classifier")
-MAX_LENGTH = 32          # 语音日历指令短句，32足够
+MAX_LENGTH = 32  # 语音日历指令短句，32足够
 BATCH_SIZE = 64
 NUM_EPOCHS = 10
-LEARNING_RATE = 2e-5     # 小数据微调更稳定
+LEARNING_RATE = 2e-5  # 小数据微调更稳定
 WEIGHT_DECAY = 0.01
-WARMUP_STEPS = 200       # 数据量缩小后适当减少
+WARMUP_STEPS = 200  # 数据量缩小后适当减少
 EARLY_STOPPING_PATIENCE = 3  # 避免过早停止
 EVAL_EVERY_STEPS = 200
 FP16 = True
@@ -85,9 +85,7 @@ def build_weighted_sampler(dataset: IntentDataset) -> torch.utils.data.WeightedR
     num_classes = len(label_counts)
     total = len(dataset)
     # 权重 = total / (num_classes * class_count)
-    class_weights = {
-        label: total / (num_classes * count) for label, count in label_counts.items()
-    }
+    class_weights = {label: total / (num_classes * count) for label, count in label_counts.items()}
     sample_weights = [class_weights[label] for label in dataset.labels]
     return torch.utils.data.WeightedRandomSampler(
         weights=sample_weights,
@@ -114,9 +112,7 @@ def evaluate(model, dataloader, device, label_names: list) -> tuple[float, float
 
     acc = accuracy_score(all_labels, all_preds)
     f1_macro = f1_score(all_labels, all_preds, average="macro")
-    report = classification_report(
-        all_labels, all_preds, target_names=label_names, zero_division=0
-    )
+    report = classification_report(all_labels, all_preds, target_names=label_names, zero_division=0)
     return acc, f1_macro, report
 
 
@@ -136,9 +132,7 @@ def train():
     # 加载 tokenizer + model
     print(f"\nLoading model: {MODEL_NAME}")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        MODEL_NAME, num_labels=num_labels
-    )
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=num_labels)
     model.to(DEVICE)
 
     # 加载数据集
@@ -155,12 +149,11 @@ def train():
     raw_weights = {lbl: total / (num_classes * cnt) for lbl, cnt in label_counts.items()}
     # 温和化：sqrt 压缩 + 归一化到 [1.0, ~2.0] 范围
     import math
+
     sqrt_weights = {lbl: math.sqrt(w) for lbl, w in raw_weights.items()}
     min_sw = min(sqrt_weights.values())
     mild_weights = {lbl: w / min_sw for lbl, w in sqrt_weights.items()}
-    class_loss_weights = torch.tensor(
-        [mild_weights[i] for i in range(num_classes)], dtype=torch.float, device=DEVICE
-    )
+    class_loss_weights = torch.tensor([mild_weights[i] for i in range(num_classes)], dtype=torch.float, device=DEVICE)
     print(f"  class_loss_weights: {class_loss_weights.tolist()}")
 
     # DataLoader（train 用 WeightedRandomSampler）
@@ -173,17 +166,11 @@ def train():
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped = [
         {
-            "params": [
-                p for n, p in model.named_parameters()
-                if not any(nd in n for nd in no_decay)
-            ],
+            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
             "weight_decay": WEIGHT_DECAY,
         },
         {
-            "params": [
-                p for n, p in model.named_parameters()
-                if any(nd in n for nd in no_decay)
-            ],
+            "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
             "weight_decay": 0.0,
         },
     ]
@@ -249,7 +236,7 @@ def train():
                 avg_loss = epoch_loss / num_batches
                 elapsed = time.time() - start_time
                 print(
-                    f"  Step {global_step:>5} | Epoch {epoch+1} | "
+                    f"  Step {global_step:>5} | Epoch {epoch + 1} | "
                     f"Loss {avg_loss:.4f} | Dev Acc {dev_acc:.4f} | "
                     f"Dev F1-macro {dev_f1:.4f} | {elapsed:.0f}s"
                 )
@@ -263,8 +250,7 @@ def train():
                     patience_counter += 1
                     if patience_counter >= EARLY_STOPPING_PATIENCE:
                         print(
-                            f"\n  Early stopping triggered at step {global_step} "
-                            f"(patience={EARLY_STOPPING_PATIENCE})"
+                            f"\n  Early stopping triggered at step {global_step} (patience={EARLY_STOPPING_PATIENCE})"
                         )
                         break
 
@@ -273,7 +259,7 @@ def train():
 
         # Epoch 结束统计
         avg_epoch_loss = epoch_loss / max(num_batches, 1)
-        print(f"Epoch {epoch+1}/{NUM_EPOCHS} complete, avg_loss={avg_epoch_loss:.4f}")
+        print(f"Epoch {epoch + 1}/{NUM_EPOCHS} complete, avg_loss={avg_epoch_loss:.4f}")
 
     elapsed_total = time.time() - start_time
     print(f"\nTraining complete in {elapsed_total:.1f}s")

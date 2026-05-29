@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
 
 from command.rule_engine import ParsedCommand, CommandType
 

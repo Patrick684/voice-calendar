@@ -18,6 +18,7 @@ from command.parser import CommandParser
 _HAS_INTENT_CLASSIFIER = False
 try:
     from command.intent_classifier import IntentClassifier
+
     _HAS_INTENT_CLASSIFIER = True
 except ImportError:
     pass
@@ -233,7 +234,9 @@ def test_parse_multiple():
     assert len(add_results) >= 2, f"期望至少 2 条添加指令，实际 {len(add_results)}"
     print(f"  [通过] 逗号分隔: {len(add_results)} 条指令")
     for r in add_results:
-        print(f"         - type={r.command_type.value}, title='{r.title}', time={r.time.strftime('%m-%d %H:%M') if r.time else 'None'}")
+        print(
+            f"         - type={r.command_type.value}, title='{r.title}', time={r.time.strftime('%m-%d %H:%M') if r.time else 'None'}"
+        )
 
     # 连接词分隔
     results = parser.parse_multiple("安排明天的团队会议还有后天的面试")
@@ -293,7 +296,7 @@ def test_parse_multiple_real_world():
     assert len(add_results) == 4, f"期望 4 条，实际 {len(add_results)}"
     print(f"  [通过] ASR错误+4事件分割: {len(add_results)} 条指令")
     for r in add_results:
-        time_str = r.time.strftime('%m-%d %H:%M') if r.time else 'None'
+        time_str = r.time.strftime("%m-%d %H:%M") if r.time else "None"
         print(f"         - title='{r.title}', time={time_str}")
 
     # 碎片过滤：纯时间片段
@@ -312,6 +315,7 @@ def test_parse_multiple_real_world():
     r = results[0]
     assert r.time is not None
     from datetime import datetime, timedelta
+
     tomorrow = datetime.now() + timedelta(days=1)
     assert r.time.day == tomorrow.day, f"期望明天，实际 {r.time.strftime('%m-%d')}"
     assert r.time.hour == 8, f"期望 8 点，实际 {r.time.hour}"
@@ -324,8 +328,7 @@ def test_parse_multiple_real_world():
     # 第二条应是 6月1号 09:00
     r2 = add_results[1]
     assert r2.time is not None
-    assert r2.time.month == 6 and r2.time.day == 1, \
-        f"期望 06-01，实际 {r2.time.strftime('%m-%d')}"
+    assert r2.time.month == 6 and r2.time.day == 1, f"期望 06-01，实际 {r2.time.strftime('%m-%d')}"
     assert r2.time.hour == 9, f"期望 9 点，实际 {r2.time.hour}"
     print(f"  [通过] 日期绑定后续事件: 买高铁票 -> {r2.time.strftime('%m-%d %H:%M')}")
 
@@ -348,14 +351,14 @@ def test_date_context_inheritance():
     results = parser.parse_multiple("明天早上8点起床下午3点开会")
     add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
     assert len(add_results) == 2, f"期望 2 条，实际 {len(add_results)}"
-    assert add_results[0].time.day == tomorrow.day, \
-        f"第1条期望明天，实际 {add_results[0].time.strftime('%m-%d')}"
+    assert add_results[0].time.day == tomorrow.day, f"第1条期望明天，实际 {add_results[0].time.strftime('%m-%d')}"
     assert add_results[0].time.hour == 8
-    assert add_results[1].time.day == tomorrow.day, \
-        f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
+    assert add_results[1].time.day == tomorrow.day, f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
     assert add_results[1].time.hour == 15
-    print(f"  [通过] 同日期继承: '起床'={add_results[0].time.strftime('%m-%d %H:%M')}, "
-          f"'开会'={add_results[1].time.strftime('%m-%d %H:%M')}")
+    print(
+        f"  [通过] 同日期继承: '起床'={add_results[0].time.strftime('%m-%d %H:%M')}, "
+        f"'开会'={add_results[1].time.strftime('%m-%d %H:%M')}"
+    )
 
     # 2. 日期切换："后天上午10点面试6月1号早上9点买高铁票"
     #    "后天" 应解析为后天，"6月1号" 应更新上下文并绑定给"买高铁票"
@@ -363,30 +366,26 @@ def test_date_context_inheritance():
     add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
     assert len(add_results) == 2, f"期望 2 条，实际 {len(add_results)}"
     r1 = add_results[0]
-    assert r1.time.day == day_after.day, \
+    assert r1.time.day == day_after.day, (
         f"第1条期望后天({day_after.strftime('%m-%d')})，实际 {r1.time.strftime('%m-%d')}"
+    )
     r2 = add_results[1]
-    assert r2.time.month == 6 and r2.time.day == 1, \
-        f"第2条期望 06-01，实际 {r2.time.strftime('%m-%d')}"
-    print(f"  [通过] 日期切换: '面试'={r1.time.strftime('%m-%d %H:%M')}, "
-          f"'买高铁票'={r2.time.strftime('%m-%d %H:%M')}")
+    assert r2.time.month == 6 and r2.time.day == 1, f"第2条期望 06-01，实际 {r2.time.strftime('%m-%d')}"
+    print(f"  [通过] 日期切换: '面试'={r1.time.strftime('%m-%d %H:%M')}, '买高铁票'={r2.time.strftime('%m-%d %H:%M')}")
 
     # 3. 完整场景："明天早上8点起床下午3点有个会后天上，午10点有个面试6月1号早上9点买高铁票"
     text = "明天早上8点起床下午3点有个会后天上，午10点有个面试6月1号早上9点买高铁票"
     results = parser.parse_multiple(text)
     add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
-    assert len(add_results) == 4, \
-        f"期望 4 条，实际 {len(add_results)}: {[r.title for r in add_results]}"
+    assert len(add_results) == 4, f"期望 4 条，实际 {len(add_results)}: {[r.title for r in add_results]}"
     # 第1条：明天 08:00 起床
     assert add_results[0].time.day == tomorrow.day
     assert add_results[0].time.hour == 8
     # 第2条：明天 15:00 有个会（继承明天）
-    assert add_results[1].time.day == tomorrow.day, \
-        f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
+    assert add_results[1].time.day == tomorrow.day, f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
     assert add_results[1].time.hour == 15
     # 第3条：后天 10:00 面试
-    assert add_results[2].time.day == day_after.day, \
-        f"第3条期望后天，实际 {add_results[2].time.strftime('%m-%d')}"
+    assert add_results[2].time.day == day_after.day, f"第3条期望后天，实际 {add_results[2].time.strftime('%m-%d')}"
     assert add_results[2].time.hour == 10
     # 第4条：6月1号 09:00 买高铁票
     assert add_results[3].time.month == 6 and add_results[3].time.day == 1
@@ -397,12 +396,14 @@ def test_date_context_inheritance():
 
     # 4. base_date 参数直接传递测试
     from command.time_parser import TimeParser
+
     tp = TimeParser()
     base = datetime(2026, 6, 15)
     parsed_time, _ = tp.parse("下午三点开会", base_date=base)
     assert parsed_time is not None
-    assert parsed_time.day == 15 and parsed_time.month == 6, \
+    assert parsed_time.day == 15 and parsed_time.month == 6, (
         f"base_date 未生效，期望 06-15，实际 {parsed_time.strftime('%m-%d')}"
+    )
     assert parsed_time.hour == 15
     print(f"  [通过] base_date 直传: '下午三点' + base=06-15 -> {parsed_time.strftime('%m-%d %H:%M')}")
 
@@ -412,21 +413,20 @@ def test_date_context_inheritance():
     add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
     assert len(add_results) == 3, f"期望 3 条，实际 {len(add_results)}"
     # 第1条：今天 21:00（“明天”在逗号前，属于第1个片段）
-    assert add_results[0].time.day == now.day, \
-        f"第1条期望今天，实际 {add_results[0].time.strftime('%m-%d')}"
+    assert add_results[0].time.day == now.day, f"第1条期望今天，实际 {add_results[0].time.strftime('%m-%d')}"
     assert add_results[0].time.hour == 21
     # 第2条：明天 10:00（继承“明天”上下文）
-    assert add_results[1].time.day == tomorrow.day, \
-        f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
+    assert add_results[1].time.day == tomorrow.day, f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
     assert add_results[1].time.hour == 10
     # 第3条：明天 21:00（继续继承“明天”）
-    assert add_results[2].time.day == tomorrow.day, \
-        f"第3条应继承明天，实际 {add_results[2].time.strftime('%m-%d')}"
+    assert add_results[2].time.day == tomorrow.day, f"第3条应继承明天，实际 {add_results[2].time.strftime('%m-%d')}"
     assert add_results[2].time.hour == 21
-    print(f"  [通过] 逗号后日期继承: "
-          f"'{add_results[0].title}'={add_results[0].time.strftime('%m-%d %H:%M')}, "
-          f"'{add_results[1].title}'={add_results[1].time.strftime('%m-%d %H:%M')}, "
-          f"'{add_results[2].title}'={add_results[2].time.strftime('%m-%d %H:%M')}")
+    print(
+        f"  [通过] 逗号后日期继承: "
+        f"'{add_results[0].title}'={add_results[0].time.strftime('%m-%d %H:%M')}, "
+        f"'{add_results[1].title}'={add_results[1].time.strftime('%m-%d %H:%M')}, "
+        f"'{add_results[2].title}'={add_results[2].time.strftime('%m-%d %H:%M')}"
+    )
 
     print()
 
@@ -557,14 +557,16 @@ def test_recurrence_detection():
 
     # 每周X
     result = engine.parse("安排每周一上午十点汇报")
-    assert result.recurrence_rule == "FREQ=WEEKLY;BYDAY=MO", \
+    assert result.recurrence_rule == "FREQ=WEEKLY;BYDAY=MO", (
         f"期望 FREQ=WEEKLY;BYDAY=MO，实际: {result.recurrence_rule}"
+    )
     print(f"  [通过] 每周一: '{result.recurrence_rule}'")
 
     # 每个星期X
     result = engine.parse("安排每个星期五下午两点开会")
-    assert result.recurrence_rule == "FREQ=WEEKLY;BYDAY=FR", \
+    assert result.recurrence_rule == "FREQ=WEEKLY;BYDAY=FR", (
         f"期望 FREQ=WEEKLY;BYDAY=FR，实际: {result.recurrence_rule}"
+    )
     print(f"  [通过] 每个星期五: '{result.recurrence_rule}'")
 
     # 每月
@@ -574,8 +576,9 @@ def test_recurrence_detection():
 
     # 工作日
     result = engine.parse("安排工作日早上九点打卡")
-    assert "BYDAY=MO,TU,WE,TH,FR" in result.recurrence_rule, \
+    assert "BYDAY=MO,TU,WE,TH,FR" in result.recurrence_rule, (
         f"期望含 BYDAY=MO,TU,WE,TH,FR，实际: {result.recurrence_rule}"
+    )
     print(f"  [通过] 工作日: '{result.recurrence_rule}'")
 
     # 非循环事件不应有 recurrence_rule
@@ -721,6 +724,7 @@ def test_past_date_parsing():
     # 过去事件创建
     import tempfile
     from calendar_pkg.manager import CalendarManager
+
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test.db")
         mgr = CalendarManager(db_path=db_path)
@@ -817,7 +821,7 @@ def test_soft_delete_restore():
         assert ok
         deleted_after = mgr.get_deleted_events()
         assert len(deleted_after) == 0
-        print(f"  [通过] 恢复事件")
+        print("  [通过] 恢复事件")
 
         # 彻底删除
         mgr.delete_event(e2.id)
@@ -825,7 +829,7 @@ def test_soft_delete_restore():
         assert ok
         deleted_final = mgr.get_deleted_events()
         assert len(deleted_final) == 0
-        print(f"  [通过] 彻底删除")
+        print("  [通过] 彻底删除")
 
     print()
 
@@ -910,12 +914,12 @@ def test_achievement_engine():
         # 再次检查不应重复解锁
         new_achs2 = ach_engine.check_achievements()
         assert len(new_achs2) == 0
-        print(f"  [通过] 不重复解锁")
+        print("  [通过] 不重复解锁")
 
         # 持久化检查
         ach_engine2 = AchievementEngine(stats_engine, save_path=ach_path)
         assert ach_engine2.get_unlocked_count() >= 1
-        print(f"  [通过] 成就持久化")
+        print("  [通过] 成就持久化")
 
     print()
 
@@ -944,17 +948,17 @@ def test_reminder_sound_and_dnd():
 
     # 免打扰时段（跨日：22:00-07:00）
     assert scheduler._is_in_dnd_period(datetime(2026, 1, 1, 23, 0))  # 23:00 在 DND 内
-    assert scheduler._is_in_dnd_period(datetime(2026, 1, 1, 5, 30))   # 05:30 在 DND 内
+    assert scheduler._is_in_dnd_period(datetime(2026, 1, 1, 5, 30))  # 05:30 在 DND 内
     assert not scheduler._is_in_dnd_period(datetime(2026, 1, 1, 10, 0))  # 10:00 不在 DND
     assert not scheduler._is_in_dnd_period(datetime(2026, 1, 1, 21, 0))  # 21:00 不在 DND
-    print(f"  [通过] 跨日免打扰: 22:00-07:00")
+    print("  [通过] 跨日免打扰: 22:00-07:00")
 
     # 同日免打扰
     scheduler._dnd_start = "12:00"
     scheduler._dnd_end = "14:00"
     assert scheduler._is_in_dnd_period(datetime(2026, 1, 1, 13, 0))
     assert not scheduler._is_in_dnd_period(datetime(2026, 1, 1, 15, 0))
-    print(f"  [通过] 同日免打扰: 12:00-14:00")
+    print("  [通过] 同日免打扰: 12:00-14:00")
 
     print()
 
@@ -978,7 +982,7 @@ def test_command_completion():
     )
     check = completer.check_completeness(cmd)
     assert check["complete"] is True
-    print(f"  [通过] 完整指令: complete=True")
+    print("  [通过] 完整指令: complete=True")
 
     # 缺少时间
     cmd_no_time = ParsedCommand(
@@ -1013,7 +1017,7 @@ def test_command_completion():
     cmd_query = ParsedCommand(command_type=CommandType.QUERY_EVENT)
     check = completer.check_completeness(cmd_query)
     assert check["complete"] is True
-    print(f"  [通过] 非 ADD 指令: 不补全")
+    print("  [通过] 非 ADD 指令: 不补全")
 
     print()
 
@@ -1053,9 +1057,11 @@ def test_intent_classifier_inference():
         return
 
     import os
+
     model_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "models", "intent_classifier",
+        "models",
+        "intent_classifier",
     )
     if not os.path.exists(model_path):
         print(f"  [跳过] 模型未训练: {model_path}")
@@ -1070,9 +1076,7 @@ def test_intent_classifier_inference():
 
     # 验证标签完整性
     expected_labels = {"add_event", "query_event", "delete_event", "update_event", "other"}
-    assert set(clf.label_names) == expected_labels, (
-        f"标签不匹配: {set(clf.label_names)} vs {expected_labels}"
-    )
+    assert set(clf.label_names) == expected_labels, f"标签不匹配: {set(clf.label_names)} vs {expected_labels}"
     print("  [通过] 标签完整性验证")
 
     # 单条推理测试
@@ -1132,9 +1136,11 @@ def test_parser_with_intent_model():
         return
 
     import os
+
     model_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "models", "intent_classifier",
+        "models",
+        "intent_classifier",
     )
     if not os.path.exists(model_path):
         print(f"  [跳过] 模型未训练: {model_path}")
@@ -1157,13 +1163,14 @@ def test_parser_with_intent_model():
     for text, expected_type in model_cases:
         result = parser_model.parse(text)
         status = "通过" if result.command_type == expected_type else "警告"
-        print(f"  [{status}] 模型集成: '{text}' → {result.command_type.value} "
-              f"(confidence={result.confidence:.3f}) [期望: {expected_type.value}]")
+        print(
+            f"  [{status}] 模型集成: '{text}' → {result.command_type.value} "
+            f"(confidence={result.confidence:.3f}) [期望: {expected_type.value}]"
+        )
 
     # 测试非日历指令（模型应识别为 UNKNOWN）
     result = parser_model.parse("帮我订一张去北京的机票")
-    print(f"  [信息] 非日历指令: → {result.command_type.value} "
-          f"(confidence={result.confidence:.3f})")
+    print(f"  [信息] 非日历指令: → {result.command_type.value} (confidence={result.confidence:.3f})")
 
     print()
 
@@ -1199,5 +1206,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n测试失败: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

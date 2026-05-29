@@ -38,7 +38,7 @@ class CommandParser:
 
     # 动态置信度阈值（模型意图分类）
     _CALENDAR_INTENT_THRESHOLD = 0.75  # 日历意图较低阈值，减少漏判
-    _OTHER_INTENT_THRESHOLD = 0.90     # other 意图较高阈值，减少误判
+    _OTHER_INTENT_THRESHOLD = 0.90  # other 意图较高阈值，减少误判
 
     # 模型意图 -> CommandType 映射
     _INTENT_TO_COMMAND = {
@@ -86,9 +86,7 @@ class CommandParser:
 
         if intent_model_enabled and IntentClassifier is not None:
             try:
-                self._intent_classifier = IntentClassifier(
-                    model_path=intent_model_path
-                )
+                self._intent_classifier = IntentClassifier(model_path=intent_model_path)
                 logger.info(f"意图分类模型已启用: {intent_model_path}")
             except FileNotFoundError:
                 logger.warning(
@@ -96,14 +94,9 @@ class CommandParser:
                     f"将回退到规则引擎。请运行 scripts/train_intent_classifier.py"
                 )
         elif intent_model_enabled:
-            logger.warning(
-                "intent_model_enabled=True 但 torch/transformers 未安装，"
-                "将回退到规则引擎"
-            )
+            logger.warning("intent_model_enabled=True 但 torch/transformers 未安装，将回退到规则引擎")
 
-    def parse(
-        self, text: str, base_date: Optional[datetime] = None
-    ) -> ParsedCommand:
+    def parse(self, text: str, base_date: Optional[datetime] = None) -> ParsedCommand:
         """解析语音指令
 
         解析优先级：
@@ -151,10 +144,7 @@ class CommandParser:
             logger.info("规则引擎置信度不足，触发 LLM 兜底...")
             llm_result = self._llm_fallback.parse(text)
             if llm_result is not None and llm_result.confidence > 0:
-                logger.info(
-                    f"LLM 结果: type={llm_result.command_type.value}, "
-                    f"confidence={llm_result.confidence}"
-                )
+                logger.info(f"LLM 结果: type={llm_result.command_type.value}, confidence={llm_result.confidence}")
                 return llm_result
 
         # 3. 均失败
@@ -165,9 +155,7 @@ class CommandParser:
             confidence=0.0,
         )
 
-    def _parse_with_model(
-        self, text: str, base_date: Optional[datetime] = None
-    ) -> Optional[ParsedCommand]:
+    def _parse_with_model(self, text: str, base_date: Optional[datetime] = None) -> Optional[ParsedCommand]:
         """使用意图分类模型解析
 
         采用动态置信度阈值：
@@ -178,9 +166,7 @@ class CommandParser:
             ParsedCommand 如果模型高置信度，否则 None（回退到规则引擎）
         """
         intent_label, confidence = self._intent_classifier.predict(text)
-        logger.info(
-            f"意图模型结果: intent={intent_label}, confidence={confidence:.3f}"
-        )
+        logger.info(f"意图模型结果: intent={intent_label}, confidence={confidence:.3f}")
 
         # 动态阈值：日历意图用较低阈值，other 用较高阈值
         if intent_label == "other":
@@ -189,9 +175,7 @@ class CommandParser:
             threshold = self._CALENDAR_INTENT_THRESHOLD
 
         if confidence < threshold:
-            logger.info(
-                f"意图模型置信度不足 ({confidence:.3f} < {threshold})，回退到规则引擎"
-            )
+            logger.info(f"意图模型置信度不足 ({confidence:.3f} < {threshold})，回退到规则引擎")
             return None
 
         # 模型判断为非日历指令
@@ -231,9 +215,7 @@ class CommandParser:
         self._llm_enabled = enabled
 
     # 多指令拆分连接词（按长度降序，长词优先匹配）
-    _SPLIT_DELIMITERS = re.compile(
-        r"(?:还有|以及|另外|然后|同时|再者|接着|其次|最后|再|[\uff0c\u3002])"
-    )
+    _SPLIT_DELIMITERS = re.compile(r"(?:还有|以及|另外|然后|同时|再者|接着|其次|最后|再|[\uff0c\u3002])")
 
     # 时间触发词：匹配到时开启新的分割片段
     # 包含：日期锚点 + 时段 + X月X号/日 + 具体时间(X点) + 中文数字时间
@@ -297,7 +279,7 @@ class CommandParser:
             if not m:
                 buffer += segment[pos:]
                 break
-            buffer += segment[pos:m.start()]
+            buffer += segment[pos : m.start()]
             if self._has_event_content(buffer):
                 # buffer 含事件内容 → 切分为新指令
                 parts.append(buffer.strip())
@@ -373,9 +355,7 @@ class CommandParser:
                 # 先解析提取日期，更新上下文
                 probe_time, _ = self._rule_engine._time_parser.parse(segment)
                 if probe_time is not None:
-                    current_date = probe_time.replace(
-                        hour=0, minute=0, second=0, microsecond=0
-                    )
+                    current_date = probe_time.replace(hour=0, minute=0, second=0, microsecond=0)
                 # 尝试正常解析（可能含事件内容）
                 cmd = self.parse(segment)
             else:

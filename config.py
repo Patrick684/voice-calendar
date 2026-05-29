@@ -39,7 +39,7 @@ class Config:
         # 免打扰时段
         "dnd_enabled": False,
         "dnd_start": "22:00",  # 免打扰开始时间
-        "dnd_end": "07:00",    # 免打扰结束时间
+        "dnd_end": "07:00",  # 免打扰结束时间
         # LLM 设置（可选，用于语音指令兜底解析）
         "llm_enabled": False,
         "llm_provider": "ollama",  # ollama/openai
@@ -77,9 +77,7 @@ class Config:
 
     def __init__(self, config_dir: Optional[str] = None):
         if config_dir is None:
-            config_dir = os.path.join(
-                os.environ.get("APPDATA", os.path.expanduser("~")), "VoiceCalendar"
-            )
+            config_dir = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "VoiceCalendar")
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.config_file = self.config_dir / "config.json"

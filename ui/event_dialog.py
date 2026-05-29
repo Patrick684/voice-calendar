@@ -60,18 +60,15 @@ class EventDialog(ctk.CTkToplevel):
         pad = {"padx": 15, "pady": 5}
 
         # 标题
-        ctk.CTkLabel(self, text="标题:", font=ctk.CTkFont(size=13)).grid(
-            row=0, column=0, sticky="w", **pad
-        )
+        ctk.CTkLabel(self, text="标题:", font=ctk.CTkFont(size=13)).grid(row=0, column=0, sticky="w", **pad)
         self._title_entry = ctk.CTkEntry(self, width=300, placeholder_text="事件标题")
         self._title_entry.grid(row=0, column=1, sticky="ew", **pad)
 
         # 日期
-        ctk.CTkLabel(self, text="日期:", font=ctk.CTkFont(size=13)).grid(
-            row=1, column=0, sticky="w", **pad
-        )
+        ctk.CTkLabel(self, text="日期:", font=ctk.CTkFont(size=13)).grid(row=1, column=0, sticky="w", **pad)
         self._date_entry = ctk.CTkEntry(
-            self, width=300,
+            self,
+            width=300,
             placeholder_text="YYYY-MM-DD",
         )
         init_date = self._default_date if self._default_date else datetime.now()
@@ -79,11 +76,10 @@ class EventDialog(ctk.CTkToplevel):
         self._date_entry.grid(row=1, column=1, sticky="ew", **pad)
 
         # 时间
-        ctk.CTkLabel(self, text="时间:", font=ctk.CTkFont(size=13)).grid(
-            row=2, column=0, sticky="w", **pad
-        )
+        ctk.CTkLabel(self, text="时间:", font=ctk.CTkFont(size=13)).grid(row=2, column=0, sticky="w", **pad)
         self._time_entry = ctk.CTkEntry(
-            self, width=300,
+            self,
+            width=300,
             placeholder_text="HH:MM（留空表示全天）",
         )
         self._time_entry.grid(row=2, column=1, sticky="ew", **pad)
@@ -91,36 +87,34 @@ class EventDialog(ctk.CTkToplevel):
         # 全天事件
         self._all_day_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
-            self, text="全天事件", variable=self._all_day_var,
+            self,
+            text="全天事件",
+            variable=self._all_day_var,
             font=ctk.CTkFont(size=13),
             command=self._toggle_all_day,
         ).grid(row=3, column=1, sticky="w", **pad)
 
         # 描述
-        ctk.CTkLabel(self, text="描述:", font=ctk.CTkFont(size=13)).grid(
-            row=4, column=0, sticky="nw", **pad
-        )
+        ctk.CTkLabel(self, text="描述:", font=ctk.CTkFont(size=13)).grid(row=4, column=0, sticky="nw", **pad)
         self._desc_text = ctk.CTkTextbox(self, width=300, height=80)
         self._desc_text.grid(row=4, column=1, sticky="ew", **pad)
 
         # 提醒
-        ctk.CTkLabel(self, text="提醒:", font=ctk.CTkFont(size=13)).grid(
-            row=5, column=0, sticky="w", **pad
-        )
+        ctk.CTkLabel(self, text="提醒:", font=ctk.CTkFont(size=13)).grid(row=5, column=0, sticky="w", **pad)
         self._reminder_var = ctk.StringVar(value="15 分钟")
         self._reminder_combo = ctk.CTkComboBox(
-            self, width=300,
+            self,
+            width=300,
             values=["不提醒", "5 分钟", "10 分钟", "15 分钟", "30 分钟", "1 小时", "1 天"],
             variable=self._reminder_var,
         )
         self._reminder_combo.grid(row=5, column=1, sticky="ew", **pad)
 
         # 标签
-        ctk.CTkLabel(self, text="标签:", font=ctk.CTkFont(size=13)).grid(
-            row=6, column=0, sticky="w", **pad
-        )
+        ctk.CTkLabel(self, text="标签:", font=ctk.CTkFont(size=13)).grid(row=6, column=0, sticky="w", **pad)
         self._tags_entry = ctk.CTkEntry(
-            self, width=300,
+            self,
+            width=300,
             placeholder_text="逗号分隔，如: 工作,重要",
         )
         self._tags_entry.grid(row=6, column=1, sticky="ew", **pad)
@@ -130,19 +124,27 @@ class EventDialog(ctk.CTkToplevel):
         btn_frame.grid(row=7, column=0, columnspan=2, pady=20)
 
         ctk.CTkButton(
-            btn_frame, text="保存", width=100,
+            btn_frame,
+            text="保存",
+            width=100,
             command=self._on_save_click,
         ).pack(side="left", padx=10)
 
         ctk.CTkButton(
-            btn_frame, text="取消", width=100,
-            fg_color="gray", command=self.destroy,
+            btn_frame,
+            text="取消",
+            width=100,
+            fg_color="gray",
+            command=self.destroy,
         ).pack(side="left", padx=10)
 
         if self._is_edit and self._on_delete:
             ctk.CTkButton(
-                btn_frame, text="删除", width=100,
-                fg_color="#e74c3c", hover_color="#c0392b",
+                btn_frame,
+                text="删除",
+                width=100,
+                fg_color="#e74c3c",
+                hover_color="#c0392b",
                 command=self._on_delete_click,
             ).pack(side="left", padx=10)
 
@@ -173,8 +175,13 @@ class EventDialog(ctk.CTkToplevel):
 
         # 提醒
         reminder_map = {
-            None: "不提醒", 5: "5 分钟", 10: "10 分钟",
-            15: "15 分钟", 30: "30 分钟", 60: "1 小时", 1440: "1 天",
+            None: "不提醒",
+            5: "5 分钟",
+            10: "10 分钟",
+            15: "15 分钟",
+            30: "30 分钟",
+            60: "1 小时",
+            1440: "1 天",
         }
         self._reminder_var.set(reminder_map.get(event.reminder_minutes, "15 分钟"))
 
@@ -225,8 +232,13 @@ class EventDialog(ctk.CTkToplevel):
 
         # 提醒
         reminder_map = {
-            "不提醒": None, "5 分钟": 5, "10 分钟": 10,
-            "15 分钟": 15, "30 分钟": 30, "1 小时": 60, "1 天": 1440,
+            "不提醒": None,
+            "5 分钟": 5,
+            "10 分钟": 10,
+            "15 分钟": 15,
+            "30 分钟": 30,
+            "1 小时": 60,
+            "1 天": 1440,
         }
         reminder = reminder_map.get(self._reminder_var.get(), 15)
 

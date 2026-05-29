@@ -14,11 +14,12 @@ logger = logging.getLogger(__name__)
 
 class CommandType(Enum):
     """指令类型"""
-    ADD_EVENT = "add_event"       # 添加事件
+
+    ADD_EVENT = "add_event"  # 添加事件
     DELETE_EVENT = "delete_event"  # 删除事件
-    QUERY_EVENT = "query_event"   # 查询事件
+    QUERY_EVENT = "query_event"  # 查询事件
     UPDATE_EVENT = "update_event"  # 修改事件
-    UNKNOWN = "unknown"           # 无法识别
+    UNKNOWN = "unknown"  # 无法识别
 
 
 @dataclass
@@ -34,6 +35,7 @@ class ParsedCommand:
         original_text: 原始输入文本
         confidence: 置信度 (0.0~1.0)
     """
+
     command_type: CommandType
     title: str = ""
     time: Optional[datetime] = None
@@ -53,41 +55,95 @@ class RuleEngine:
 
     # 添加事件的触发关键词
     ADD_KEYWORDS = [
-        "添加", "新增", "新建", "创建", "安排", "记录", "预约",
-        "提醒我", "帮我记", "设个", "定个", "加个", "加一个",
+        "添加",
+        "新增",
+        "新建",
+        "创建",
+        "安排",
+        "记录",
+        "预约",
+        "提醒我",
+        "帮我记",
+        "设个",
+        "定个",
+        "加个",
+        "加一个",
     ]
 
     # 删除事件的触发关键词
     DELETE_KEYWORDS = [
-        "删除", "取消", "去掉", "删掉", "移除", "撤销", "不要了",
-        "取消掉", "删了",
+        "删除",
+        "取消",
+        "去掉",
+        "删掉",
+        "移除",
+        "撤销",
+        "不要了",
+        "取消掉",
+        "删了",
     ]
 
     # 查询事件的触发关键词
     QUERY_PHRASES = [
-        "有什么安排", "有什么日程", "有什么事项", "有什么计划",
-        "有哪些安排", "有哪些日程",
-        "查看日程", "查看行程", "查看安排",
-        "看看日程", "看看行程", "看看安排",
+        "有什么安排",
+        "有什么日程",
+        "有什么事项",
+        "有什么计划",
+        "有哪些安排",
+        "有哪些日程",
+        "查看日程",
+        "查看行程",
+        "查看安排",
+        "看看日程",
+        "看看行程",
+        "看看安排",
     ]
 
     # 查询单个关键词（优先级低于添加/删除，作为后备）
     QUERY_KEYWORDS = [
-        "查看", "看看", "有什么", "有哪些",
-        "日程", "行程", "计划", "待办", "待办事项", "事项",
+        "查看",
+        "看看",
+        "有什么",
+        "有哪些",
+        "日程",
+        "行程",
+        "计划",
+        "待办",
+        "待办事项",
+        "事项",
     ]
 
     # 修改事件的触发关键词
     UPDATE_KEYWORDS = [
-        "修改", "改一下", "改成", "更改", "调整", "推迟",
-        "提前", "改到", "改为",
+        "修改",
+        "改一下",
+        "改成",
+        "更改",
+        "调整",
+        "推迟",
+        "提前",
+        "改到",
+        "改为",
     ]
 
     # 用于清理标题中的噪音词
     TITLE_NOISE_WORDS = [
-        "一个", "一条", "一下", "帮我", "请", "给我", "要",
-        "把", "将", "那个", "这个", "有个", "左右", "大约",
-        "大概", "差不多",
+        "一个",
+        "一条",
+        "一下",
+        "帮我",
+        "请",
+        "给我",
+        "要",
+        "把",
+        "将",
+        "那个",
+        "这个",
+        "有个",
+        "左右",
+        "大约",
+        "大概",
+        "差不多",
     ]
 
     # 标题首部噪音词（包含助词）
@@ -96,10 +152,16 @@ class RuleEngine:
     # 优先级关键词（按优先级降序排列）
     PRIORITY_CRITICAL_WORDS = ["\u7d27\u6025\u4e14\u91cd\u8981", "\u65e2\u7d27\u6025\u53c8\u91cd\u8981"]
     PRIORITY_URGENT_WORDS = [
-        "\u7d27\u6025", "\u5fc5\u987b", "\u622a\u6b62", "deadline", "\u9a6c\u4e0a", "\u7acb\u523b", "\u5c3d\u5feb",
+        "\u7d27\u6025",
+        "\u5fc5\u987b",
+        "\u622a\u6b62",
+        "deadline",
+        "\u9a6c\u4e0a",
+        "\u7acb\u523b",
+        "\u5c3d\u5feb",
     ]
     PRIORITY_IMPORTANT_WORDS = ["\u91cd\u8981", "\u52a1\u5fc5", "\u4e00\u5b9a", "\u4e0d\u80fd\u5fd8"]
-    
+
     # 循环事件关键词 → RRULE 映射
     # 格式: (关键词, FREQ, 附加参数)
     RECURRENCE_PATTERNS = [
@@ -114,11 +176,17 @@ class RuleEngine:
         ("每日", "DAILY", ""),
         ("工作日", "WEEKLY", "BYDAY=MO,TU,WE,TH,FR"),
     ]
-    
+
     # 星期映射
     WEEKDAY_MAP = {
-        "一": "MO", "二": "TU", "三": "WE", "四": "TH",
-        "五": "FR", "六": "SA", "日": "SU", "天": "SU",
+        "一": "MO",
+        "二": "TU",
+        "三": "WE",
+        "四": "TH",
+        "五": "FR",
+        "六": "SA",
+        "日": "SU",
+        "天": "SU",
     }
 
     def __init__(self):
@@ -142,9 +210,7 @@ class RuleEngine:
         """
         text = text.strip()
         if not text:
-            return ParsedCommand(
-                command_type=CommandType.UNKNOWN, original_text=text
-            )
+            return ParsedCommand(command_type=CommandType.UNKNOWN, original_text=text)
 
         # 按优先级依次匹配
         for cmd_type, pattern in [
@@ -194,22 +260,16 @@ class RuleEngine:
             ParsedCommand
         """
         # 移除关键词，剩余部分用于提取时间和标题
-        text_without_keyword = (
-            text[:keyword_match.start()] + text[keyword_match.end():]
-        ).strip()
+        text_without_keyword = (text[: keyword_match.start()] + text[keyword_match.end() :]).strip()
 
         # 解析时间
-        parsed_time, remaining = self._time_parser.parse(
-            text_without_keyword, base_date=base_date
-        )
+        parsed_time, remaining = self._time_parser.parse(text_without_keyword, base_date=base_date)
 
         # 检测优先级
         priority = self._detect_priority(text)
 
         # 检测循环规则
-        recurrence_rule, text_without_recurrence = self._detect_recurrence(
-            text_without_keyword
-        )
+        recurrence_rule, text_without_recurrence = self._detect_recurrence(text_without_keyword)
         # 如果从去关键词文本中未检测到，尝试从原始文本检测
         if not recurrence_rule:
             recurrence_rule, _ = self._detect_recurrence(text)
@@ -241,9 +301,7 @@ class RuleEngine:
             confidence=0.8,
         )
 
-    def _try_implicit_add(
-        self, text: str, base_date: Optional[datetime] = None
-    ) -> Optional[ParsedCommand]:
+    def _try_implicit_add(self, text: str, base_date: Optional[datetime] = None) -> Optional[ParsedCommand]:
         """尝试隐式添加指令（无明确关键词，但有时间+标题）
 
         例如："明天下午三点开会" → 隐式添加事件
@@ -317,16 +375,14 @@ class RuleEngine:
             return "", text
 
         # 尝试匹配 “每周X” / “每个星期X” (带星期后缀)
-        weekday_pattern = re.compile(
-            r"(?:每周|每个星期)([一二三四五六日天])"
-        )
+        weekday_pattern = re.compile(r"(?:每周|每个星期)([一二三四五六日天])")
         m = weekday_pattern.search(text)
         if m:
             day_char = m.group(1)
             day_code = cls.WEEKDAY_MAP.get(day_char, "")
             if day_code:
                 rule = f"FREQ=WEEKLY;BYDAY={day_code}"
-                cleaned = text[:m.start()] + text[m.end():]
+                cleaned = text[: m.start()] + text[m.end() :]
                 return rule, cleaned.strip()
 
         # 尝试匹配固定模式列表
@@ -361,7 +417,7 @@ class RuleEngine:
         # 去除首部助词（的/了/吧等）
         for lead_word in self.TITLE_LEAD_NOISE:
             while text.startswith(lead_word):
-                text = text[len(lead_word):].strip()
+                text = text[len(lead_word) :].strip()
 
         # 合并多余空白
         text = re.sub(r"\s+", " ", text).strip()

@@ -3,7 +3,7 @@
 import calendar as cal_mod
 import logging
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict
 
 import customtkinter as ctk
 
@@ -74,26 +74,32 @@ class StatsView(ctk.CTkToplevel):
         nav_frame.pack(fill="x", pady=(10, 5))
 
         self._heatmap_prev = ctk.CTkButton(
-            nav_frame, text="◀", width=35,
+            nav_frame,
+            text="◀",
+            width=35,
             command=self._heatmap_prev_month,
         )
         self._heatmap_prev.pack(side="left", padx=5)
 
         self._heatmap_label = ctk.CTkLabel(
-            nav_frame, text="",
+            nav_frame,
+            text="",
             font=ctk.CTkFont(size=15, weight="bold"),
         )
         self._heatmap_label.pack(side="left", padx=10)
 
         self._heatmap_next = ctk.CTkButton(
-            nav_frame, text="▶", width=35,
+            nav_frame,
+            text="▶",
+            width=35,
             command=self._heatmap_next_month,
         )
         self._heatmap_next.pack(side="left", padx=5)
 
         # 连续打卡天数
         self._streak_label = ctk.CTkLabel(
-            nav_frame, text="",
+            nav_frame,
+            text="",
             font=ctk.CTkFont(size=13),
             text_color="#e67e22",
         )
@@ -107,32 +113,34 @@ class StatsView(ctk.CTkToplevel):
         legend_frame = ctk.CTkFrame(self._tab_heatmap, fg_color="transparent")
         legend_frame.pack(fill="x", padx=10, pady=(0, 10))
         ctk.CTkLabel(
-            legend_frame, text="事件密度:", font=ctk.CTkFont(size=11),
+            legend_frame,
+            text="事件密度:",
+            font=ctk.CTkFont(size=11),
         ).pack(side="left", padx=(0, 5))
         for color, label in [
-            ("#ebedf0", "0"), ("#9be9a8", "1-2"),
-            ("#40c463", "3-5"), ("#30a14e", "6+"),
+            ("#ebedf0", "0"),
+            ("#9be9a8", "1-2"),
+            ("#40c463", "3-5"),
+            ("#30a14e", "6+"),
         ]:
             box = ctk.CTkFrame(legend_frame, width=15, height=15, fg_color=color)
             box.pack(side="left", padx=2)
             ctk.CTkLabel(
-                legend_frame, text=label, font=ctk.CTkFont(size=10),
+                legend_frame,
+                text=label,
+                font=ctk.CTkFont(size=10),
             ).pack(side="left", padx=(0, 8))
 
         self._refresh_heatmap()
 
     def _refresh_heatmap(self):
         """刷新月度热力图"""
-        self._heatmap_label.configure(
-            text=f"{self._view_year}年 {self._view_month}月"
-        )
+        self._heatmap_label.configure(text=f"{self._view_year}年 {self._view_month}月")
 
         streak = self._stats.get_streak()
         self._streak_label.configure(text=f"🔥 连续打卡 {streak} 天")
 
-        heatmap_data = self._stats.get_heatmap_data(
-            self._view_year, self._view_month
-        )
+        heatmap_data = self._stats.get_heatmap_data(self._view_year, self._view_month)
 
         # 清空旧内容
         for widget in self._heatmap_frame.winfo_children():
@@ -143,7 +151,8 @@ class StatsView(ctk.CTkToplevel):
         weekday_frame.pack(fill="x")
         for day_name in ["一", "二", "三", "四", "五", "六", "日"]:
             ctk.CTkLabel(
-                weekday_frame, text=day_name,
+                weekday_frame,
+                text=day_name,
                 font=ctk.CTkFont(size=11, weight="bold"),
                 width=35,
             ).pack(side="left", expand=True)
@@ -158,22 +167,22 @@ class StatsView(ctk.CTkToplevel):
             for day_idx, day in enumerate(week):
                 if day == 0:
                     ctk.CTkLabel(days_frame, text="", width=35, height=35).grid(
-                        row=week_idx, column=day_idx, padx=1, pady=1,
+                        row=week_idx,
+                        column=day_idx,
+                        padx=1,
+                        pady=1,
                     )
                     continue
 
-                date_str = (
-                    f"{self._view_year:04d}-"
-                    f"{self._view_month:02d}-"
-                    f"{day:02d}"
-                )
+                date_str = f"{self._view_year:04d}-{self._view_month:02d}-{day:02d}"
                 count = heatmap_data.get(date_str, 0)
                 color = self._get_heatmap_color(count)
 
                 cell = ctk.CTkButton(
                     days_frame,
                     text=str(day),
-                    width=35, height=35,
+                    width=35,
+                    height=35,
                     fg_color=color,
                     hover_color=color,
                     text_color="white" if count > 0 else "#999",
@@ -216,7 +225,9 @@ class StatsView(ctk.CTkToplevel):
             font=ctk.CTkFont(size=13),
         ).pack()
         ctk.CTkButton(
-            dialog, text="关闭", width=80,
+            dialog,
+            text="关闭",
+            width=80,
             command=dialog.destroy,
         ).pack(pady=10)
 
@@ -247,19 +258,24 @@ class StatsView(ctk.CTkToplevel):
         nav_frame.pack(fill="x", pady=(10, 5))
 
         self._stats_prev = ctk.CTkButton(
-            nav_frame, text="◀", width=35,
+            nav_frame,
+            text="◀",
+            width=35,
             command=self._stats_prev_month,
         )
         self._stats_prev.pack(side="left", padx=5)
 
         self._stats_label = ctk.CTkLabel(
-            nav_frame, text="",
+            nav_frame,
+            text="",
             font=ctk.CTkFont(size=15, weight="bold"),
         )
         self._stats_label.pack(side="left", padx=10)
 
         self._stats_next = ctk.CTkButton(
-            nav_frame, text="▶", width=35,
+            nav_frame,
+            text="▶",
+            width=35,
             command=self._stats_next_month,
         )
         self._stats_next.pack(side="left", padx=5)
@@ -276,13 +292,9 @@ class StatsView(ctk.CTkToplevel):
 
     def _refresh_stats(self):
         """刷新分类统计"""
-        self._stats_label.configure(
-            text=f"{self._view_year}年 {self._view_month}月"
-        )
+        self._stats_label.configure(text=f"{self._view_year}年 {self._view_month}月")
 
-        stats = self._stats.get_monthly_stats(
-            self._view_year, self._view_month
-        )
+        stats = self._stats.get_monthly_stats(self._view_year, self._view_month)
 
         # 清空旧内容
         for widget in self._stats_scroll.winfo_children():
@@ -299,10 +311,7 @@ class StatsView(ctk.CTkToplevel):
             # 总览
             total_events = sum(d["total"] for d in stats.values())
             total_completed = sum(d["completed"] for d in stats.values())
-            overall_rate = (
-                round(total_completed / total_events * 100, 1)
-                if total_events > 0 else 0
-            )
+            overall_rate = round(total_completed / total_events * 100, 1) if total_events > 0 else 0
 
             summary_card = ctk.CTkFrame(self._stats_scroll, corner_radius=8)
             summary_card.pack(fill="x", pady=5)
@@ -314,22 +323,22 @@ class StatsView(ctk.CTkToplevel):
 
             # 各分类卡片
             category_colors = {
-                "工作": "#2196F3", "健康": "#4CAF50", "学习": "#FF9800",
-                "生活": "#9C27B0", "娱乐": "#E91E63", "社交": "#00BCD4",
+                "工作": "#2196F3",
+                "健康": "#4CAF50",
+                "学习": "#FF9800",
+                "生活": "#9C27B0",
+                "娱乐": "#E91E63",
+                "社交": "#00BCD4",
                 "其他": "#757575",
             }
 
-            for cat_name, cat_data in sorted(
-                stats.items(), key=lambda x: x[1]["total"], reverse=True
-            ):
+            for cat_name, cat_data in sorted(stats.items(), key=lambda x: x[1]["total"], reverse=True):
                 self._create_category_card(cat_name, cat_data, category_colors)
 
         # 刷新趋势图
         self._refresh_trend()
 
-    def _create_category_card(
-        self, cat_name: str, cat_data: Dict, colors: Dict
-    ):
+    def _create_category_card(self, cat_name: str, cat_data: Dict, colors: Dict):
         """创建分类统计卡片"""
         card = ctk.CTkFrame(self._stats_scroll, corner_radius=8)
         card.pack(fill="x", pady=3)
@@ -342,13 +351,15 @@ class StatsView(ctk.CTkToplevel):
         color_dot = ctk.CTkFrame(header, width=12, height=12, fg_color=color)
         color_dot.pack(side="left", padx=(0, 8))
         ctk.CTkLabel(
-            header, text=cat_name,
+            header,
+            text=cat_name,
             font=ctk.CTkFont(size=14, weight="bold"),
         ).pack(side="left")
 
         rate_text = f"{cat_data['completed']}/{cat_data['total']} ({cat_data['rate'] * 100:.0f}%)"
         ctk.CTkLabel(
-            header, text=rate_text,
+            header,
+            text=rate_text,
             font=ctk.CTkFont(size=12),
             text_color="gray",
         ).pack(side="right")
@@ -459,21 +470,24 @@ class StatsView(ctk.CTkToplevel):
 
         icon_text = ach["icon"] if ach["unlocked"] else "🔒"
         ctk.CTkLabel(
-            header, text=icon_text,
+            header,
+            text=icon_text,
             font=ctk.CTkFont(size=18),
             width=30,
         ).pack(side="left")
 
         name_color = "#333" if ach["unlocked"] else "#999"
         ctk.CTkLabel(
-            header, text=ach["name"],
+            header,
+            text=ach["name"],
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=name_color,
         ).pack(side="left", padx=(5, 0))
 
         if ach["unlocked"]:
             ctk.CTkLabel(
-                header, text="✓ 已解锁",
+                header,
+                text="✓ 已解锁",
                 font=ctk.CTkFont(size=11),
                 text_color="#4CAF50",
             ).pack(side="right")
@@ -481,7 +495,8 @@ class StatsView(ctk.CTkToplevel):
         # 描述
         desc_color = "#666" if ach["unlocked"] else "#aaa"
         ctk.CTkLabel(
-            card, text=ach["description"],
+            card,
+            text=ach["description"],
             font=ctk.CTkFont(size=12),
             text_color=desc_color,
             anchor="w",
@@ -489,7 +504,8 @@ class StatsView(ctk.CTkToplevel):
 
         if ach["unlocked"] and ach["unlocked_at"]:
             ctk.CTkLabel(
-                card, text=f"解锁于 {ach['unlocked_at']}",
+                card,
+                text=f"解锁于 {ach['unlocked_at']}",
                 font=ctk.CTkFont(size=10),
                 text_color="#999",
                 anchor="w",
@@ -516,15 +532,19 @@ class StatsView(ctk.CTkToplevel):
         popup.transient(self)
 
         ctk.CTkLabel(
-            popup, text=f"{ach['icon']} 成就解锁!",
+            popup,
+            text=f"{ach['icon']} 成就解锁!",
             font=ctk.CTkFont(size=16, weight="bold"),
         ).pack(pady=(15, 5))
         ctk.CTkLabel(
-            popup, text=f"{ach['name']} - {ach['description']}",
+            popup,
+            text=f"{ach['name']} - {ach['description']}",
             font=ctk.CTkFont(size=12),
             wraplength=260,
         ).pack()
         ctk.CTkButton(
-            popup, text="太棒了!", width=80,
+            popup,
+            text="太棒了!",
+            width=80,
             command=popup.destroy,
         ).pack(pady=10)

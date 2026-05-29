@@ -156,9 +156,7 @@ class CalendarManager:
         end = start + timedelta(days=1)
         return self._storage.get_events_by_range(start, end)
 
-    def get_events_by_range(
-        self, start: datetime, end: datetime
-    ) -> List[CalendarEvent]:
+    def get_events_by_range(self, start: datetime, end: datetime) -> List[CalendarEvent]:
         """查询时间范围内的事件（含循环事件展开）"""
         # 普通事件
         events = self._storage.get_events_by_range(start, end)
@@ -207,9 +205,7 @@ class CalendarManager:
     # ================================================================
 
     @staticmethod
-    def _expand_recurring(
-        event: CalendarEvent, range_start: datetime, range_end: datetime
-    ) -> List[CalendarEvent]:
+    def _expand_recurring(event: CalendarEvent, range_start: datetime, range_end: datetime) -> List[CalendarEvent]:
         """将循环事件展开为指定范围内的具体实例
 
         Args:
@@ -347,4 +343,3 @@ class CalendarManager:
         if event.reminder_minutes is not None:
             parts.append(f"提醒: 提前 {event.reminder_minutes} 分钟")
         return "\n".join(parts)
-

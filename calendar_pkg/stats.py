@@ -1,7 +1,7 @@
 """打卡统计模块 - 完成率、热力图数据、趋势分析"""
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 
 from calendar_pkg.storage import SQLiteStorage
 
@@ -15,9 +15,7 @@ class StatsEngine:
     def __init__(self, storage: SQLiteStorage):
         self._storage = storage
 
-    def get_monthly_stats(
-        self, year: int, month: int
-    ) -> Dict[str, Dict]:
+    def get_monthly_stats(self, year: int, month: int) -> Dict[str, Dict]:
         """获取指定月份各分类统计数据
 
         Returns:
@@ -44,15 +42,11 @@ class StatsEngine:
         # 计算完成率
         for cat_data in stats.values():
             if cat_data["total"] > 0:
-                cat_data["rate"] = round(
-                    cat_data["completed"] / cat_data["total"], 2
-                )
+                cat_data["rate"] = round(cat_data["completed"] / cat_data["total"], 2)
 
         return stats
 
-    def get_heatmap_data(
-        self, year: int, month: int
-    ) -> Dict[str, int]:
+    def get_heatmap_data(self, year: int, month: int) -> Dict[str, int]:
         """获取月度热力图数据（每天的事件数量）
 
         Returns:
@@ -73,9 +67,7 @@ class StatsEngine:
 
         return heatmap
 
-    def get_trend_data(
-        self, days: int = 30
-    ) -> List[Tuple[str, int]]:
+    def get_trend_data(self, days: int = 30) -> List[Tuple[str, int]]:
         """获取最近 N 天的每日事件数量趋势
 
         Returns:

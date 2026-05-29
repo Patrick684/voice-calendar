@@ -94,16 +94,10 @@ class PunctuationRestorer:
                 on_progress("标点恢复模型加载完成")
 
         except ImportError:
-            logger.warning(
-                "PunctuationRestorer: funasr 未安装，降级为规则标点方案。"
-                "请安装: pip install funasr"
-            )
+            logger.warning("PunctuationRestorer: funasr 未安装，降级为规则标点方案。请安装: pip install funasr")
             self._fallback = True
         except Exception as e:
-            logger.warning(
-                f"PunctuationRestorer: CT-Transformer 加载失败 ({e})，"
-                "降级为规则标点方案"
-            )
+            logger.warning(f"PunctuationRestorer: CT-Transformer 加载失败 ({e})，降级为规则标点方案")
             self._fallback = True
 
     def restore(self, text: str) -> str:

@@ -104,9 +104,7 @@ class AudioRecorder:
                 try:
                     input_device = sd.default.device[0]
                     device_info = sd.query_devices(input_device)
-                    logger.info(
-                        f"使用默认输入设备: [{input_device}] {device_info['name']}"
-                    )
+                    logger.info(f"使用默认输入设备: [{input_device}] {device_info['name']}")
                 except Exception:
                     logger.info("使用 sounddevice 默认设备")
 
@@ -116,9 +114,7 @@ class AudioRecorder:
                     device=input_device,
                     channels=1,
                     dtype="float32",
-                    blocksize=int(
-                        self.sample_rate * 0.2
-                    ),  # 200ms 块，提高 Windows 稳定性
+                    blocksize=int(self.sample_rate * 0.2),  # 200ms 块，提高 Windows 稳定性
                     callback=self._audio_callback,
                 )
                 self._stream.start()
@@ -166,10 +162,7 @@ class AudioRecorder:
         rms = np.sqrt(np.mean(audio_data**2))
         peak = np.max(np.abs(audio_data))
         duration = len(audio_data) / self.sample_rate
-        logger.info(
-            f"音频统计: 时长={duration:.2f}s, RMS={rms:.4f}, "
-            f"峰值={peak:.4f}, 采样点={len(audio_data)}"
-        )
+        logger.info(f"音频统计: 时长={duration:.2f}s, RMS={rms:.4f}, 峰值={peak:.4f}, 采样点={len(audio_data)}")
 
         return audio_data
 

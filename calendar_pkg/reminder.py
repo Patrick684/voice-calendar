@@ -69,9 +69,7 @@ class ReminderScheduler:
             return
 
         self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._run_loop, daemon=True, name="ReminderScheduler"
-        )
+        self._thread = threading.Thread(target=self._run_loop, daemon=True, name="ReminderScheduler")
         self._thread.start()
         logger.info(f"提醒调度器已启动，扫描间隔: {self._check_interval}s")
 
@@ -142,9 +140,7 @@ class ReminderScheduler:
             return False
 
         # 计算提醒触发时间 = 事件开始时间 - 提醒分钟数
-        trigger_time = event.start_time - timedelta(
-            minutes=event.reminder_minutes
-        )
+        trigger_time = event.start_time - timedelta(minutes=event.reminder_minutes)
 
         # 当前时间在触发时间之后（含），且事件尚未结束
         return now >= trigger_time and now <= event.start_time
@@ -153,9 +149,7 @@ class ReminderScheduler:
         """触发提醒回调"""
         sound_file = self.get_sound_for_category(event.category)
         logger.info(
-            f"触发提醒: {event.title} "
-            f"(提前 {event.reminder_minutes} 分钟, "
-            f"分类={event.category}, 音效={sound_file})"
+            f"触发提醒: {event.title} (提前 {event.reminder_minutes} 分钟, 分类={event.category}, 音效={sound_file})"
         )
         if self._on_reminder:
             try:
@@ -172,9 +166,7 @@ class ReminderScheduler:
         Returns:
             音效文件名
         """
-        return self._reminder_sounds.get(
-            category, self._reminder_sounds.get("默认", "default.wav")
-        )
+        return self._reminder_sounds.get(category, self._reminder_sounds.get("默认", "default.wav"))
 
     def _is_in_dnd_period(self, now: datetime) -> bool:
         """判断当前是否在免打扰时段内

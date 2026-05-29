@@ -73,9 +73,7 @@ class RecognitionHistory:
     # 默认最大保留记录数
     DEFAULT_MAX_RECORDS = 500
 
-    def __init__(
-        self, history_file: Optional[str] = None, max_records: int = DEFAULT_MAX_RECORDS
-    ):
+    def __init__(self, history_file: Optional[str] = None, max_records: int = DEFAULT_MAX_RECORDS):
         """
         初始化历史管理器
 
@@ -129,9 +127,7 @@ class RecognitionHistory:
 
     # ---- 记录管理 ----
 
-    def add_record(
-        self, text: str, duration: float = 0.0, model: str = ""
-    ) -> HistoryRecord:
+    def add_record(self, text: str, duration: float = 0.0, model: str = "") -> HistoryRecord:
         """
         添加一条识别记录
 
@@ -206,7 +202,5 @@ class RecognitionHistory:
             "total_records": len(self._records),
             "total_characters": total_text_len,
             "total_duration_seconds": round(total_duration, 1),
-            "avg_characters": round(total_text_len / len(self._records), 1)
-            if self._records
-            else 0,
+            "avg_characters": round(total_text_len / len(self._records), 1) if self._records else 0,
         }

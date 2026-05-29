@@ -138,15 +138,11 @@ class HotkeyManager:
             if ambiguous_keys and hotkey_lower in ambiguous_keys:
                 is_match = event_name == hotkey_lower
                 if not is_match:
-                    logger.debug(
-                        f"扫描码模糊过滤: scan_code={scan_code}, name={event_name}, 期望={hotkey_lower}"
-                    )
+                    logger.debug(f"扫描码模糊过滤: scan_code={scan_code}, name={event_name}, 期望={hotkey_lower}")
                 return is_match
 
         if not is_match:
-            logger.debug(
-                f"扫描码过滤: scan_code={scan_code}, 期望={valid_codes}, key={event_name}"
-            )
+            logger.debug(f"扫描码过滤: scan_code={scan_code}, 期望={valid_codes}, key={event_name}")
         return is_match
 
     def _on_key_press(self, event):

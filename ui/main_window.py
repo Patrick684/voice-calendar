@@ -3,7 +3,7 @@
 import calendar as cal_mod
 import logging
 from collections import deque
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Callable, List, Dict
 
 import customtkinter as ctk
@@ -69,8 +69,11 @@ class MainWindow(ctk.CTk):
 
         # 拖拽状态（左键 + 移动阈值）
         self._drag_data: Dict = {
-            "event": None, "source_date": None,
-            "start_x": 0, "start_y": 0, "dragging": False,
+            "event": None,
+            "source_date": None,
+            "start_x": 0,
+            "start_y": 0,
+            "dragging": False,
         }
         self._day_cells: Dict[str, ctk.CTkButton] = {}  # date_str -> cell widget
 
@@ -85,8 +88,12 @@ class MainWindow(ctk.CTk):
 
         # 分类颜色（从配置获取，使用默认值）
         self._category_colors: Dict[str, str] = {
-            "工作": "#2196F3", "健康": "#4CAF50", "学习": "#FF9800",
-            "生活": "#9C27B0", "娱乐": "#E91E63", "社交": "#00BCD4",
+            "工作": "#2196F3",
+            "健康": "#4CAF50",
+            "学习": "#FF9800",
+            "生活": "#9C27B0",
+            "娱乐": "#E91E63",
+            "社交": "#00BCD4",
             "其他": "#757575",
         }
 
@@ -129,16 +136,16 @@ class MainWindow(ctk.CTk):
         self._setup_event_list()
 
         # 底部：语音面板
-        self._voice_panel = VoicePanel(
-            self, on_voice_button=self._on_voice_click
-        )
+        self._voice_panel = VoicePanel(self, on_voice_button=self._on_voice_click)
         self._voice_panel.pack(fill="x", padx=10, pady=(5, 10))
 
     def _setup_toolbar(self):
         """构建顶部工具栏"""
         # 左侧：月份导航
         self._prev_btn = ctk.CTkButton(
-            self._toolbar, text="◀", width=35,
+            self._toolbar,
+            text="◀",
+            width=35,
             command=self._prev_month,
         )
         self._prev_btn.pack(side="left", padx=(10, 5), pady=8)
@@ -151,37 +158,49 @@ class MainWindow(ctk.CTk):
         self._month_label.pack(side="left", padx=5, pady=8)
 
         self._next_btn = ctk.CTkButton(
-            self._toolbar, text="▶", width=35,
+            self._toolbar,
+            text="▶",
+            width=35,
             command=self._next_month,
         )
         self._next_btn.pack(side="left", padx=(5, 10), pady=8)
 
         self._today_btn = ctk.CTkButton(
-            self._toolbar, text="今天", width=60,
+            self._toolbar,
+            text="今天",
+            width=60,
             command=self._go_today,
         )
         self._today_btn.pack(side="left", padx=5, pady=8)
 
         # 右侧：功能按钮
         ctk.CTkButton(
-            self._toolbar, text="⚙ 设置", width=80,
+            self._toolbar,
+            text="⚙ 设置",
+            width=80,
             command=self._open_settings,
         ).pack(side="right", padx=(5, 10), pady=8)
 
         if self._stats_engine and self._achievement_engine:
             ctk.CTkButton(
-                self._toolbar, text="📈 统计", width=80,
+                self._toolbar,
+                text="📈 统计",
+                width=80,
                 command=self._open_stats,
             ).pack(side="right", padx=5, pady=8)
 
         ctk.CTkButton(
-            self._toolbar, text="+ 添加事件", width=100,
+            self._toolbar,
+            text="+ 添加事件",
+            width=100,
             command=lambda: self._open_event_dialog(),
         ).pack(side="right", padx=5, pady=8)
 
         # 排序模式切换
         self._sort_btn = ctk.CTkButton(
-            self._toolbar, text="⏱ 时间排序", width=100,
+            self._toolbar,
+            text="⏱ 时间排序",
+            width=100,
             command=self._toggle_sort_mode,
         )
         self._sort_btn.pack(side="right", padx=5, pady=8)
@@ -195,7 +214,8 @@ class MainWindow(ctk.CTk):
         weekdays = ["一", "二", "三", "四", "五", "六", "日"]
         for i, day_name in enumerate(weekdays):
             ctk.CTkLabel(
-                self._weekday_frame, text=day_name,
+                self._weekday_frame,
+                text=day_name,
                 font=ctk.CTkFont(size=12, weight="bold"),
                 width=40,
             ).pack(side="left", expand=True)
@@ -208,7 +228,8 @@ class MainWindow(ctk.CTk):
         """构建事件列表"""
         # 标题
         self._event_list_label = ctk.CTkLabel(
-            self._event_frame, text="当日事件",
+            self._event_frame,
+            text="当日事件",
             font=ctk.CTkFont(size=14, weight="bold"),
         )
         self._event_list_label.pack(padx=10, pady=(10, 5), anchor="w")
@@ -228,14 +249,10 @@ class MainWindow(ctk.CTk):
     def _refresh_calendar(self):
         """刷新月历视图"""
         # 更新月份标签
-        self._month_label.configure(
-            text=f"{self._view_year}年 {self._view_month}月"
-        )
+        self._month_label.configure(text=f"{self._view_year}年 {self._view_month}月")
 
         # 获取有事件的日期
-        self._event_dates = self._manager.get_month_event_dates(
-            self._view_year, self._view_month
-        )
+        self._event_dates = self._manager.get_month_event_dates(self._view_year, self._view_month)
 
         # 清空旧格子
         for widget in self._days_frame.winfo_children():
@@ -250,17 +267,16 @@ class MainWindow(ctk.CTk):
                 if day == 0:
                     # 空白格子
                     ctk.CTkLabel(self._days_frame, text="").grid(
-                        row=week_idx, column=day_idx, sticky="nsew",
-                        padx=1, pady=1,
+                        row=week_idx,
+                        column=day_idx,
+                        sticky="nsew",
+                        padx=1,
+                        pady=1,
                     )
                     continue
 
                 date_str = f"{self._view_year:04d}-{self._view_month:02d}-{day:02d}"
-                is_today = (
-                    today.year == self._view_year
-                    and today.month == self._view_month
-                    and today.day == day
-                )
+                is_today = today.year == self._view_year and today.month == self._view_month and today.day == day
                 is_selected = (
                     self._selected_date.year == self._view_year
                     and self._selected_date.month == self._view_month
@@ -269,8 +285,13 @@ class MainWindow(ctk.CTk):
                 has_event = date_str in self._event_dates
 
                 self._create_day_cell(
-                    week_idx, day_idx, day, date_str,
-                    is_today, is_selected, has_event,
+                    week_idx,
+                    day_idx,
+                    day,
+                    date_str,
+                    is_today,
+                    is_selected,
+                    has_event,
                 )
 
             # 配置行权重
@@ -281,8 +302,14 @@ class MainWindow(ctk.CTk):
             self._days_frame.grid_columnconfigure(col, weight=1)
 
     def _create_day_cell(
-        self, row, col, day, date_str,
-        is_today, is_selected, has_event,
+        self,
+        row,
+        col,
+        day,
+        date_str,
+        is_today,
+        is_selected,
+        has_event,
     ):
         """创建单个日期格子（支持拖拽放置）"""
         bg_color = "#f0f0f0"
@@ -298,7 +325,8 @@ class MainWindow(ctk.CTk):
         cell = ctk.CTkButton(
             self._days_frame,
             text=str(day) + (" •" if has_event else ""),
-            width=40, height=40,
+            width=40,
+            height=40,
             fg_color=bg_color,
             hover_color="#2980b9",
             text_color=text_color,
@@ -332,9 +360,7 @@ class MainWindow(ctk.CTk):
             events.sort(key=lambda e: (-e.priority, e.start_time))
         # 默认按时间排序（已由 storage 返回有序列表）
 
-        self._event_list_label.configure(
-            text=f"{date_str} 的事件 ({len(events)})"
-        )
+        self._event_list_label.configure(text=f"{date_str} 的事件 ({len(events)})")
 
         if not events:
             self._empty_label = ctk.CTkLabel(
@@ -377,14 +403,16 @@ class MainWindow(ctk.CTk):
             priority_marker = " ★"
 
         ctk.CTkLabel(
-            content, text=title_text + priority_marker,
+            content,
+            text=title_text + priority_marker,
             font=ctk.CTkFont(size=13),
             anchor="w",
         ).pack(fill="x", padx=10, pady=(8, 2))
 
         if event.description:
             ctk.CTkLabel(
-                content, text=event.description,
+                content,
+                text=event.description,
                 font=ctk.CTkFont(size=11),
                 text_color="gray",
                 anchor="w",
@@ -399,7 +427,8 @@ class MainWindow(ctk.CTk):
             info_parts.extend(f"[{t}]" for t in event.tags)
         if info_parts:
             ctk.CTkLabel(
-                content, text="  ".join(info_parts),
+                content,
+                text="  ".join(info_parts),
                 font=ctk.CTkFont(size=10),
                 text_color=cat_color,
                 anchor="w",
@@ -468,15 +497,21 @@ class MainWindow(ctk.CTk):
         if self._drag_data.get("dragging"):
             # 拖拽模式：放置已由 _on_drag_drop 处理
             self._drag_data = {
-                "event": None, "source_date": None,
-                "start_x": 0, "start_y": 0, "dragging": False,
+                "event": None,
+                "source_date": None,
+                "start_x": 0,
+                "start_y": 0,
+                "dragging": False,
             }
             self._refresh_calendar()
         else:
             # 点击模式：打开编辑对话框
             self._drag_data = {
-                "event": None, "source_date": None,
-                "start_x": 0, "start_y": 0, "dragging": False,
+                "event": None,
+                "source_date": None,
+                "start_x": 0,
+                "start_y": 0,
+                "dragging": False,
             }
             self._open_event_dialog(cal_event)
 
@@ -523,27 +558,29 @@ class MainWindow(ctk.CTk):
                 )
 
             # 记录撤销信息
-            self._undo_stack.append({
-                "event_id": cal_event.id,
-                "old_start": cal_event.start_time,
-                "old_end": cal_event.end_time,
-            })
+            self._undo_stack.append(
+                {
+                    "event_id": cal_event.id,
+                    "old_start": cal_event.start_time,
+                    "old_end": cal_event.end_time,
+                }
+            )
 
             self._manager.update_event(
                 cal_event.id,
                 start_time=new_start,
                 end_time=new_end,
             )
-            logger.info(
-                f"拖拽移动: {cal_event.title} "
-                f"{source_date_str} -> {target_date_str}"
-            )
+            logger.info(f"拖拽移动: {cal_event.title} {source_date_str} -> {target_date_str}")
         except Exception as e:
             logger.error(f"拖拽失败: {e}")
 
         self._drag_data = {
-            "event": None, "source_date": None,
-            "start_x": 0, "start_y": 0, "dragging": False,
+            "event": None,
+            "source_date": None,
+            "start_x": 0,
+            "start_y": 0,
+            "dragging": False,
         }
         self._refresh_calendar()
         self._refresh_event_list()
@@ -590,7 +627,7 @@ class MainWindow(ctk.CTk):
 
     def _update_time_dial(self):
         """根据当前选中事件更新拨盘显示"""
-        if not hasattr(self, '_time_dial'):
+        if not hasattr(self, "_time_dial"):
             self._setup_time_dial()
 
         if self._active_event and self._active_event.id is not None:
@@ -627,20 +664,20 @@ class MainWindow(ctk.CTk):
             new_end = new_start + duration
 
         # 记录撤销
-        self._undo_stack.append({
-            "event_id": self._active_event.id,
-            "old_start": old_start,
-            "old_end": self._active_event.end_time,
-        })
+        self._undo_stack.append(
+            {
+                "event_id": self._active_event.id,
+                "old_start": old_start,
+                "old_end": self._active_event.end_time,
+            }
+        )
 
         self._manager.update_event(
             self._active_event.id,
             start_time=new_start,
             end_time=new_end,
         )
-        logger.info(
-            f"拨盘调整: {self._active_event.title} → {hour:02d}:{minute:02d}"
-        )
+        logger.info(f"拨盘调整: {self._active_event.title} → {hour:02d}:{minute:02d}")
         self._refresh_event_list()
 
     # ================================================================
@@ -699,6 +736,7 @@ class MainWindow(ctk.CTk):
 
     def _open_event_dialog(self, event: Optional[CalendarEvent] = None):
         """打开事件编辑对话框"""
+
         def on_save(data: dict):
             if event and event.id:
                 # 编辑模式
@@ -719,7 +757,10 @@ class MainWindow(ctk.CTk):
             self._refresh_event_list()
 
         EventDialog(
-            self, event=event, on_save=on_save, on_delete=on_delete,
+            self,
+            event=event,
+            on_save=on_save,
+            on_delete=on_delete,
             default_date=self._selected_date,
         )
 
@@ -779,7 +820,8 @@ class MainWindow(ctk.CTk):
             font=ctk.CTkFont(size=13),
         ).pack()
         ctk.CTkButton(
-            dialog, text="知道了", width=80,
+            dialog,
+            text="知道了",
+            width=80,
             command=dialog.destroy,
         ).pack(pady=15)
-

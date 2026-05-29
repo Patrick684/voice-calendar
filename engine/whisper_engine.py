@@ -151,9 +151,7 @@ class WhisperEngine:
         return "".join(result).strip()
 
     @staticmethod
-    def _normalize_audio(
-        audio: np.ndarray, target_peak: float = 0.8, max_gain: float = 10.0
-    ) -> np.ndarray:
+    def _normalize_audio(audio: np.ndarray, target_peak: float = 0.8, max_gain: float = 10.0) -> np.ndarray:
         """
         归一化音频电平，确保 Whisper 获得足够响的输入
 
@@ -172,15 +170,11 @@ class WhisperEngine:
         if peak < target_peak * 0.5:  # 峰值低于目标的一半时，进行增益补偿
             gain = min(target_peak / peak, max_gain)  # 限制最大增益，防止放大底噪
             audio = audio * gain
-            logger.info(
-                f"音频增益: {gain:.1f}x (原始峰值={peak:.4f}, 上限={max_gain}x)"
-            )
+            logger.info(f"音频增益: {gain:.1f}x (原始峰值={peak:.4f}, 上限={max_gain}x)")
 
         return audio
 
-    def _build_prompt(
-        self, language: Optional[str], user_prompt: Optional[str]
-    ) -> Optional[str]:
+    def _build_prompt(self, language: Optional[str], user_prompt: Optional[str]) -> Optional[str]:
         """
         构建组合引导提示词，融合语言引导和用户热词
 
