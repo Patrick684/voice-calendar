@@ -100,7 +100,7 @@ class VoicePanel(ctk.CTkFrame):
         display_text = message if message else default_text
 
         self._state_indicator.configure(
-            text=f"● {default_text}",
+            text=f"● {display_text}",
             text_color=color,
         )
 

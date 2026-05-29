@@ -316,7 +316,7 @@ class VoiceCalendarApp:
             command.time = tomorrow
             logger.warning(f"未解析到时间，使用默认值: {command.time}")
 
-        event = self._calendar.add_event(
+        self._calendar.add_event(
             title=command.title,
             start_time=command.time,
         )
@@ -397,7 +397,7 @@ class VoiceCalendarApp:
             self._main_window.show_voice_result(text)
 
         elif msg_type == "command_executed":
-            message, action = result[1], result[2]
+            message = result[1]
             self._main_window.show_voice_result(message)
             self._main_window.set_voice_state(VoiceState.SUCCESS, message)
             self._main_window.refresh_all()

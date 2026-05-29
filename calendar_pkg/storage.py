@@ -267,10 +267,6 @@ class SQLiteStorage:
             即将触发提醒的事件列表
         """
         from_str = from_time.isoformat(timespec="seconds")
-        ahead_time = from_time.replace(
-            minute=from_time.minute + minutes_ahead
-        ) if minutes_ahead < 60 else from_time
-        # 简化处理：用 datetime 计算
         from datetime import timedelta
         ahead_str = (from_time + timedelta(minutes=minutes_ahead)).isoformat(
             timespec="seconds"

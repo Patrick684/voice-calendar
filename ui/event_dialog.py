@@ -1,7 +1,7 @@
 """事件编辑对话框 - 添加/编辑日历事件的弹窗"""
 
 import customtkinter as ctk
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Callable
 
 from calendar_pkg.event import CalendarEvent

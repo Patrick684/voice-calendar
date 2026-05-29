@@ -2,7 +2,7 @@
 
 import calendar as cal_mod
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Callable, List
 
 import customtkinter as ctk

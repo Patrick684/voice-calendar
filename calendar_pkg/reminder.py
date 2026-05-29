@@ -2,9 +2,8 @@
 
 import logging
 import threading
-import time
 from datetime import datetime, timedelta
-from typing import Callable, List, Optional, Set
+from typing import Callable, Optional, Set
 
 from calendar_pkg.event import CalendarEvent
 from calendar_pkg.manager import CalendarManager

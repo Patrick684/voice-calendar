@@ -1,0 +1,11 @@
+[tool.ruff]
+exclude = [".venv", "__pycache__", ".git", ".ruff_cache"]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["F841"]
