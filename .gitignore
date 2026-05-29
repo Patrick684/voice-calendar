@@ -30,6 +30,7 @@ models/
 *.db
 .env
 output/
+chinese-roberta-wwm-ext/
 
 # Linters
 .ruff_cache/
