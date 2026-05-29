@@ -28,7 +28,9 @@ jobs:
           pip install python-dateutil pypinyin zhconv
 
       - name: Lint with ruff
-        run: ruff check .
+        run: |
+          ruff check .
+          ruff format --check .
 
       - name: Run calendar tests
         run: python tests/verify_calendar.py

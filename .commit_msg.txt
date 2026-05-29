@@ -1,12 +1,15 @@
-style: ruff check --fix + ruff format 全量修复
+fix: storage 软删除过滤遗漏 + CI 增加 format 检查 + pre-commit hook
 
 ## 功能描述
-- ruff check --fix: 修复 17 个 lint 错误（8×F541 f-string无占位符, 7×F401 未使用导入, 2×W293 空行含空白）
-- ruff format: 32 个文件格式化（缩进、引号、空行规范化）
+- get_event_by_id 添加 deleted_at IS NULL 过滤（软删除后不再返回已删除事件）
+- get_event_count 添加 deleted_at IS NULL 过滤（计数排除已删除事件）
+- CI workflow 增加 ruff format --check
+- 新增 .qoder/hooks/pre-commit（ruff check + format + 全量测试）
 
 ## 实现思路
-使用项目 pyproject.toml 中的 ruff 配置（line-length=120, select=E/F/W, ignore=E501）
-执行 .venv\Scripts\python.exe -m ruff check --fix 和 ruff format
+修复 verify_calendar.py 测试失败：delete_event 改为软删除后，
+get_event_by_id 和 get_event_count 未同步添加 deleted_at 过滤条件
 
 ## 测试方法
-.venv\Scripts\python.exe tests/verify_command.py 全部通过
+.venv\Scripts\python.exe tests/verify_calendar.py 通过
+.venv\Scripts\python.exe tests/verify_command.py 通过

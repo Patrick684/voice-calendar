@@ -271,7 +271,7 @@ class SQLiteStorage:
         """
         conn = self._get_connection()
         try:
-            cursor = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,))
+            cursor = conn.execute("SELECT * FROM events WHERE id = ? AND deleted_at IS NULL", (event_id,))
             row = cursor.fetchone()
             if row:
                 return CalendarEvent.from_row(dict(row))
@@ -391,7 +391,7 @@ class SQLiteStorage:
         """获取事件总数"""
         conn = self._get_connection()
         try:
-            cursor = conn.execute("SELECT COUNT(*) as cnt FROM events")
+            cursor = conn.execute("SELECT COUNT(*) as cnt FROM events WHERE deleted_at IS NULL")
             return cursor.fetchone()["cnt"]
         finally:
             conn.close()
