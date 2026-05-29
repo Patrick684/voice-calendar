@@ -1,23 +1,22 @@
-feat: 拖拽排序 + 打卡日历 + 成就体系
+feat: 拖拽改为左键+阈值 + 时间拨盘精调
 
 ## 功能描述
-实现 Task 6（拖拽排序）和 Task 9（打卡日历 + 趋势图 + 成就体系）
-- 月视图事件拖拽：右键拖拽事件卡片到其他日期格子，自动更新事件日期
-- 事件卡片增强：分类颜色条、优先级标记（★/❗）、分类标签显示
-- 排序模式切换：工具栏新增「时间排序/优先级排序」切换按钮
-- Ctrl+Z 撤销拖拽操作（最多 20 步）
-- 统计引擎：月度分类完成率、热力图数据、趋势分析、连续打卡天数
-- 成就系统：10 个规则驱动的成就（初次启程/小有成就/日程达人/效率大师/连续打卡/分类专家）
-- 统计视图：三标签页（热力图日历 + 分类统计 + 成就徽章）
+重构拖拽交互模式，结合两种时间调整方式：
+- 左键拖拽跨日期：按下后移动超过5px阈值进入拖拽模式，拖到目标日期格子释放即移动
+- 左键轻点打开编辑：未超过阈值的点击直接打开事件编辑对话框
+- 时间拨盘（TimeDial）：24h水平标尺+半小时吸附，选中事件后底部展开
+- 点击事件卡片左侧颜色条选中事件，拨盘显示当前时间位置
+- 拨盘拖拽调整时间，实时更新事件 start_time
+- 工作时间段(8:00-18:00)背景高亮
 
 ## 实现思路
-- main_window.py: 添加拖拽状态管理、排序模式、撤销栈，增强事件卡片渲染
-- stats.py: StatsEngine 类，基于 SQLiteStorage 计算完成率/热力图/趋势/连续打卡
-- achievement.py: AchievementEngine 类，lambda 规则检测 + JSON 持久化
-- stats_view.py: CustomTkinter 多标签页视图，热力图日历/分类卡片/成就徽章
-- manager.py: 暴露 storage property 供 StatsEngine 使用
-- main.py: 初始化引擎并传入 MainWindow，添加事件后自动检查成就
+- main_window.py: 重写拖拽为 ButtonPress-1 + B1-Motion + ButtonRelease-1 + 5px阈值
+  - _on_press 记录起始位置，_on_motion 检测阈值后进入拖拽
+  - _on_release 判断：拖拽模式→已由 _on_drag_drop 处理；点击模式→打开编辑对话框
+- time_dial.py: Canvas 自绘水平时间标尺，48个半小时刻度槽
+  - 工作时间区域(16-36 slot)绿色背景高亮
+  - 悬停高亮 + 拖拽滑块 + 实时时间标签
+  - set_event/clear 接口与事件列表联动
 
 ## 测试方法
-运行 python -m tests.verify_command 执行全部测试
-新增 test_stats_engine() 和 test_achievement_engine() 测试函数
+.venv\Scripts\python.exe tests/verify_command.py 全部通过

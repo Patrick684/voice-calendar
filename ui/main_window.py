@@ -15,6 +15,7 @@ from calendar_pkg.achievement import AchievementEngine
 from ui.voice_panel import VoicePanel, VoiceState
 from ui.event_dialog import EventDialog
 from ui.stats_view import StatsView
+from ui.time_dial import TimeDial
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +67,11 @@ class MainWindow(ctk.CTk):
         # 按钮录音即时状态标记（避免轮询延迟导致竞态）
         self._is_recording = False
 
-        # 拖拽状态
-        self._drag_data: Dict = {"event": None, "source_date": None, "widget": None}
+        # 拖拽状态（左键 + 移动阈值）
+        self._drag_data: Dict = {
+            "event": None, "source_date": None,
+            "start_x": 0, "start_y": 0, "dragging": False,
+        }
         self._day_cells: Dict[str, ctk.CTkButton] = {}  # date_str -> cell widget
 
         # 撤销栈
@@ -75,6 +79,9 @@ class MainWindow(ctk.CTk):
 
         # 事件列表排序模式
         self._sort_mode = "time"  # "time" 或 "priority"
+
+        # 当前选中的事件（用于拨盘）
+        self._active_event: Optional[CalendarEvent] = None
 
         # 分类颜色（从配置获取，使用默认值）
         self._category_colors: Dict[str, str] = {
@@ -300,10 +307,10 @@ class MainWindow(ctk.CTk):
         )
         cell.grid(row=row, column=col, sticky="nsew", padx=1, pady=1)
 
-        # 拖拽放置目标
+        # 拖拽放置目标（左键按下 + 移动阈值）
         cell.bind("<Enter>", lambda e, ds=date_str: self._on_drag_enter(ds))
         cell.bind("<Leave>", lambda e, ds=date_str: self._on_drag_leave(ds))
-        cell.bind("<ButtonRelease-3>", lambda e, ds=date_str: self._on_drag_drop(ds))
+        cell.bind("<ButtonRelease-1>", lambda e, ds=date_str: self._on_drag_drop(ds))
 
         self._day_cells[date_str] = cell
 
@@ -342,8 +349,11 @@ class MainWindow(ctk.CTk):
         for event in events:
             self._create_event_card(event)
 
+        # 显示时间拨盘
+        self._update_time_dial()
+
     def _create_event_card(self, event: CalendarEvent):
-        """创建事件卡片（含分类颜色条 + 拖拽支持）"""
+        """创建事件卡片（含分类颜色条 + 左键拖拽）"""
         card = ctk.CTkFrame(self._event_scroll, corner_radius=8)
         card.pack(fill="x", pady=3)
 
@@ -395,38 +405,84 @@ class MainWindow(ctk.CTk):
                 anchor="w",
             ).pack(fill="x", padx=10, pady=(0, 5))
 
-        # 点击编辑
-        card.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
-        for child in card.winfo_children():
-            child.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
-            for grandchild in child.winfo_children():
-                grandchild.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
+        # 选中事件 → 更新拨盘（单击左侧颜色条区域选中）
+        color_bar.bind(
+            "<Button-1>",
+            lambda e, ev=event: self._select_event(ev),
+        )
 
-        # 拖拽开始（仅真实事件支持，虚拟循环实例不可拖拽）
+        # 左键拖拽（仅真实事件，移动阈值区分点击/拖拽）
         if event.id is not None:
-            card.bind("<ButtonPress-3>", lambda e, ev=event: self._on_drag_start(e, ev))
+            self._bind_drag_events(card, event)
             for child in card.winfo_children():
-                child.bind("<ButtonPress-3>", lambda e, ev=event: self._on_drag_start(e, ev))
+                self._bind_drag_events(child, event)
+                for grandchild in child.winfo_children():
+                    self._bind_drag_events(grandchild, event)
+        else:
+            # 虚拟循环实例只能点击编辑
+            card.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
+            for child in card.winfo_children():
+                child.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
+                for grandchild in child.winfo_children():
+                    grandchild.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
+
+    def _bind_drag_events(self, widget, event: CalendarEvent):
+        """绑定左键拖拽事件（带移动阈值）"""
+        widget.bind("<ButtonPress-1>", lambda e, ev=event: self._on_press(e, ev))
+        widget.bind("<B1-Motion>", self._on_motion)
+        widget.bind("<ButtonRelease-1>", lambda e, ev=event: self._on_release(e, ev))
 
     # ================================================================
-    # 拖拽排序
+    # 拖拽排序（左键 + 移动阈值）
     # ================================================================
 
-    def _on_drag_start(self, event, cal_event: CalendarEvent):
-        """拖拽开始（右键拖拽）"""
+    _DRAG_THRESHOLD = 5  # 像素阈值，超过才算拖拽
+
+    def _on_press(self, event, cal_event: CalendarEvent):
+        """左键按下 - 记录起始位置"""
         self._drag_data = {
             "event": cal_event,
             "source_date": cal_event.start_time.strftime("%Y-%m-%d"),
-            "widget": event.widget,
+            "start_x": event.x_root,
+            "start_y": event.y_root,
+            "dragging": False,
         }
-        # 视觉反馈：高亮源日期格子
-        source_cell = self._day_cells.get(self._drag_data["source_date"])
-        if source_cell:
-            source_cell.configure(fg_color="#e67e22")
+
+    def _on_motion(self, event):
+        """左键拖拽中 - 超过阈值进入拖拽模式"""
+        if self._drag_data.get("event") is None:
+            return
+        if not self._drag_data["dragging"]:
+            dx = abs(event.x_root - self._drag_data["start_x"])
+            dy = abs(event.y_root - self._drag_data["start_y"])
+            if dx + dy < self._DRAG_THRESHOLD:
+                return
+            # 进入拖拽模式
+            self._drag_data["dragging"] = True
+            source_cell = self._day_cells.get(self._drag_data["source_date"])
+            if source_cell:
+                source_cell.configure(fg_color="#e67e22")
+
+    def _on_release(self, event, cal_event: CalendarEvent):
+        """左键释放 - 判断是点击还是拖拽"""
+        if self._drag_data.get("dragging"):
+            # 拖拽模式：放置已由 _on_drag_drop 处理
+            self._drag_data = {
+                "event": None, "source_date": None,
+                "start_x": 0, "start_y": 0, "dragging": False,
+            }
+            self._refresh_calendar()
+        else:
+            # 点击模式：打开编辑对话框
+            self._drag_data = {
+                "event": None, "source_date": None,
+                "start_x": 0, "start_y": 0, "dragging": False,
+            }
+            self._open_event_dialog(cal_event)
 
     def _on_drag_enter(self, date_str: str):
         """拖拽进入日期格子"""
-        if self._drag_data.get("event") is None:
+        if not self._drag_data.get("dragging"):
             return
         cell = self._day_cells.get(date_str)
         if cell:
@@ -434,23 +490,21 @@ class MainWindow(ctk.CTk):
 
     def _on_drag_leave(self, date_str: str):
         """拖拽离开日期格子"""
-        if self._drag_data.get("event") is None:
+        if not self._drag_data.get("dragging"):
             return
-        # 恢复原始颜色
         self._refresh_calendar()
 
     def _on_drag_drop(self, target_date_str: str):
         """拖拽放置到目标日期"""
+        if not self._drag_data.get("dragging"):
+            return
+
         cal_event = self._drag_data.get("event")
         if cal_event is None or cal_event.id is None:
-            self._drag_data = {"event": None, "source_date": None, "widget": None}
             return
 
         source_date_str = self._drag_data["source_date"]
         if source_date_str == target_date_str:
-            # 拖到同一天，无操作
-            self._drag_data = {"event": None, "source_date": None, "widget": None}
-            self._refresh_calendar()
             return
 
         try:
@@ -475,21 +529,22 @@ class MainWindow(ctk.CTk):
                 "old_end": cal_event.end_time,
             })
 
-            # 更新事件日期
             self._manager.update_event(
                 cal_event.id,
                 start_time=new_start,
                 end_time=new_end,
             )
             logger.info(
-                f"拖拽移动事件: {cal_event.title} "
+                f"拖拽移动: {cal_event.title} "
                 f"{source_date_str} -> {target_date_str}"
             )
         except Exception as e:
             logger.error(f"拖拽失败: {e}")
 
-        # 重置拖拽状态
-        self._drag_data = {"event": None, "source_date": None, "widget": None}
+        self._drag_data = {
+            "event": None, "source_date": None,
+            "start_x": 0, "start_y": 0, "dragging": False,
+        }
         self._refresh_calendar()
         self._refresh_event_list()
 
@@ -504,7 +559,7 @@ class MainWindow(ctk.CTk):
         self._refresh_event_list()
 
     def _on_undo(self, event=None):
-        """Ctrl+Z 撤销上次拖拽"""
+        """Ctrl+Z 撤销上次拖拽/拨盘"""
         if not self._undo_stack:
             return
         action = self._undo_stack.pop()
@@ -512,13 +567,81 @@ class MainWindow(ctk.CTk):
             self._manager.update_event(
                 action["event_id"],
                 start_time=action["old_start"],
-                end_time=action["old_end"],
+                end_time=action.get("old_end"),
             )
-            logger.info(f"撤销拖拽: event_id={action['event_id']}")
+            logger.info(f"撤销: event_id={action['event_id']}")
             self._refresh_calendar()
             self._refresh_event_list()
         except Exception as e:
             logger.error(f"撤销失败: {e}")
+
+    # ================================================================
+    # 时间拨盘
+    # ================================================================
+
+    def _setup_time_dial(self):
+        """在事件列表底部初始化时间拨盘"""
+        self._time_dial = TimeDial(
+            self._event_frame,
+            on_time_change=self._on_time_dial_change,
+        )
+        # 默认隐藏，选中事件后显示
+        self._time_dial_visible = False
+
+    def _update_time_dial(self):
+        """根据当前选中事件更新拨盘显示"""
+        if not hasattr(self, '_time_dial'):
+            self._setup_time_dial()
+
+        if self._active_event and self._active_event.id is not None:
+            if not self._time_dial_visible:
+                self._time_dial.pack(fill="x", padx=10, pady=(0, 5))
+                self._time_dial_visible = True
+            self._time_dial.set_event(
+                self._active_event.id,
+                self._active_event.start_time,
+            )
+        else:
+            if self._time_dial_visible:
+                self._time_dial.pack_forget()
+                self._time_dial_visible = False
+            self._time_dial.clear()
+
+    def _select_event(self, event: CalendarEvent):
+        """选中事件，更新拨盘"""
+        self._active_event = event
+        self._update_time_dial()
+
+    def _on_time_dial_change(self, hour: int, minute: int):
+        """拨盘时间变更回调"""
+        if self._active_event is None or self._active_event.id is None:
+            return
+
+        old_start = self._active_event.start_time
+        new_start = old_start.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+        new_end = None
+        if self._active_event.end_time:
+            # 保持时长不变
+            duration = self._active_event.end_time - old_start
+            new_end = new_start + duration
+
+        # 记录撤销
+        self._undo_stack.append({
+            "event_id": self._active_event.id,
+            "old_start": old_start,
+            "old_end": self._active_event.end_time,
+        })
+
+        self._manager.update_event(
+            self._active_event.id,
+            start_time=new_start,
+            end_time=new_end,
+        )
+        logger.info(
+            f"拨盘调整: {self._active_event.title} → {hour:02d}:{minute:02d}"
+        )
+        self._refresh_event_list()
 
     # ================================================================
     # 事件处理
