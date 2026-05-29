@@ -227,43 +227,84 @@ class CommandParser:
         r"(?:还有|以及|另外|然后|同时|再者|接着|其次|最后|再|[\uff0c\u3002])"
     )
 
-    # 时间边界分割正则（在时间关键词/数字时间前拆分）
-    _TIME_BOUNDARY_SPLIT = re.compile(
-        r"(?=(?:大后天|后天|明天|今天|今日|今晚|明晚|"
-        r"早上|早晨|上午|中午|下午|傍晚|晚上|晚间|凌晨|"
-        r"(?<!\d)\d{1,2}点))"
+    # 时间触发词：匹配到时开启新的分割片段
+    # 包含：日期锚点 + 时段 + X月X号/日 + 具体时间(X点) + 中文数字时间
+    _COMMAND_TIME_TRIGGERS = re.compile(
+        r"(?:大后天|后天|明天|今天|今日|今晚|明晚"
+        r"|(?:下|这)?(?:周|星期)[一二三四五六日天]"
+        r"|\d{1,2}月\d{1,2}[号日]"
+        r"|早上|早晨|上午|中午|下午|傍晚|晚上|晚间|凌晨"
+        r"|(?<!\d)\d{1,2}点"
+        r"|[一二两三四五六七八九十]+点)"
     )
 
-    # 纯日期/时段词（用于合并无标题的时间片段）
-    _DATE_PERIOD_WORDS = {
-        "大后天", "后天", "明天", "今天", "今日", "今晚", "明晚",
-        "早上", "早晨", "上午", "中午", "下午", "傍晚", "晚上", "晚间", "凌晨",
-    }
+    # ASR 标点修复用的已知时间词
+    _ASR_TIME_WORDS = {"上午", "下午", "中午", "晚上", "早上", "凌晨", "傍晚"}
 
-    def _split_by_time_boundaries(self, segment: str) -> list:
-        """按时间关键词边界进一步拆分片段
+    @staticmethod
+    def _fix_asr_punctuation(text: str) -> str:
+        """修复 ASR 在时间词中间插入的错误标点
 
-        当 Whisper 输出无标点的多事件文本时，在时间关键词前拆分。
-        纯日期/时段片段（如单独的"明天"）会自动与下一片段合并。
+        例：'后天上，午' -> '后天上午'
         """
-        parts = self._TIME_BOUNDARY_SPLIT.split(segment)
-        parts = [p.strip() for p in parts if p.strip()]
-        if len(parts) <= 1:
-            return parts
-        # 合并无标题的纯日期/时段片段到下一段（保持"明天下午"不拆分）
-        merged = [parts[0]]
-        for part in parts[1:]:
-            prev = merged[-1].strip()
-            if prev in self._DATE_PERIOD_WORDS:
-                merged[-1] = prev + part
+        _TIME_WORDS = CommandParser._ASR_TIME_WORDS
+
+        def _try_merge(m):
+            merged = m.group(1) + m.group(2)
+            return merged if merged in _TIME_WORDS else m.group(0)
+
+        return re.sub(r"(.)[，,、](.)", _try_merge, text)
+
+    def _has_event_content(self, text: str) -> bool:
+        """检查文本是否包含事件内容（非纯时间表达式）"""
+        _, remaining = self._rule_engine._time_parser.parse(text)
+        remaining = re.sub(r"[，,.。！!？?\s]", "", remaining)
+        return len(remaining) > 0
+
+    def _split_by_time_triggers(self, segment: str) -> list:
+        """按时间触发词分割：遇到触发词且 buffer 包含事件内容则切分
+
+        核心规则：只有当 buffer 中包含事件内容（非纯时间词）时才切分，
+        确保 '明天早上' 不被拆散，而 '10点面试6月1号...' 正确分割。
+        """
+        parts = []
+        buffer = ""
+        pos = 0
+        while pos < len(segment):
+            m = self._COMMAND_TIME_TRIGGERS.search(segment, pos)
+            if not m:
+                buffer += segment[pos:]
+                break
+            buffer += segment[pos:m.start()]
+            if self._has_event_content(buffer):
+                # buffer 含事件内容 → 切分为新指令
+                parts.append(buffer.strip())
+                buffer = m.group()
             else:
-                merged.append(part)
-        return merged
+                # buffer 纯时间或空 → 延伸
+                buffer += m.group()
+            pos = m.end()
+        if buffer.strip():
+            parts.append(buffer.strip())
+        return parts
+
+    def _is_valid_segment(self, text: str) -> bool:
+        """过滤无效片段：太短、纯时间无事件
+
+        例：'午'（单字）、'明天早上'（纯时间）均返回 False
+        """
+        text = text.strip()
+        if len(text) <= 1:
+            return False
+        # 纯时间片段：移除时间表达式后无实质内容
+        _, remaining = self._rule_engine._time_parser.parse(text)
+        remaining = re.sub(r"[，,.。！!？?\s]", "", remaining)
+        return len(remaining) > 1
 
     def parse_multiple(self, text: str) -> List[ParsedCommand]:
         """解析可能包含多个指令的文本
 
-        分三层拆分：连接词/标点 → 时间边界 → 逐句解析。
+        分三层拆分：ASR 纠错 → 连接词/标点 → 时间触发词 → 碎片过滤 → 逐句解析。
 
         Args:
             text: 语音识别后的完整文本
@@ -271,14 +312,20 @@ class CommandParser:
         Returns:
             ParsedCommand 列表（仅包含可识别的指令）
         """
-        # 第一层：按连接词/标点拆分
-        segments = self._SPLIT_DELIMITERS.split(text)
-        segments = [s.strip() for s in segments if s.strip()]
+        # 0. ASR 标点修复（如 '后天上，午' -> '后天上午'）
+        text = self._fix_asr_punctuation(text)
 
-        # 第二层：对每个片段按时间边界进一步拆分
+        # 第一层：按连接词/标点拆分
+        raw = self._SPLIT_DELIMITERS.split(text)
+        raw = [s.strip() for s in raw if s.strip()]
+
+        # 第二层：时间触发词分割
         all_segments: List[str] = []
-        for segment in segments:
-            all_segments.extend(self._split_by_time_boundaries(segment))
+        for seg in raw:
+            all_segments.extend(self._split_by_time_triggers(seg))
+
+        # 碎片过滤（纯时间、单字等无效片段）
+        all_segments = [s for s in all_segments if self._is_valid_segment(s)]
 
         # 如果拆分后只有一段，直接走单次解析
         if len(all_segments) <= 1:

@@ -271,6 +271,60 @@ def test_parse_multiple():
     print()
 
 
+def test_parse_multiple_real_world():
+    """真实语音输入场景测试（修复回归）"""
+    print("=" * 50)
+    print("测试 CommandParser 真实语音场景")
+    print("=" * 50)
+
+    parser = CommandParser(llm_enabled=False)
+
+    # 原始失败案例（含 ASR 标点错误 "后天上，午"）
+    text = "明天早上8点起床下午3点有个会后天上，午10点有个面试6月1号早上9点买高铁票。"
+    results = parser.parse_multiple(text)
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) == 4, f"期望 4 条，实际 {len(add_results)}"
+    print(f"  [通过] ASR错误+4事件分割: {len(add_results)} 条指令")
+    for r in add_results:
+        time_str = r.time.strftime('%m-%d %H:%M') if r.time else 'None'
+        print(f"         - title='{r.title}', time={time_str}")
+
+    # 碎片过滤：纯时间片段
+    results = parser.parse_multiple("明天早上")
+    assert len(results) == 0, f"纯时间应过滤，实际 {len(results)}"
+    print("  [通过] 纯时间片段过滤: '明天早上' -> 0 条")
+
+    # 碎片过滤：单字碎片
+    results = parser.parse_multiple("午")
+    assert len(results) == 0, f"单字应过滤，实际 {len(results)}"
+    print("  [通过] 单字碎片过滤: '午' -> 0 条")
+
+    # 日期不割裂："明天早上8点起床" 应保留日期
+    results = parser.parse_multiple("明天早上8点起床")
+    assert len(results) == 1
+    r = results[0]
+    assert r.time is not None
+    from datetime import datetime, timedelta
+    tomorrow = datetime.now() + timedelta(days=1)
+    assert r.time.day == tomorrow.day, f"期望明天，实际 {r.time.strftime('%m-%d')}"
+    assert r.time.hour == 8, f"期望 8 点，实际 {r.time.hour}"
+    print(f"  [通过] 日期不割裂: '明天早上8点起床' -> {r.time.strftime('%m-%d %H:%M')}")
+
+    # 跨事件日期绑定："6月1号" 应绑定给后续事件
+    results = parser.parse_multiple("后天上午10点面试6月1号早上9点买高铁票")
+    add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
+    assert len(add_results) == 2, f"期望 2 条，实际 {len(add_results)}"
+    # 第二条应是 6月1号 09:00
+    r2 = add_results[1]
+    assert r2.time is not None
+    assert r2.time.month == 6 and r2.time.day == 1, \
+        f"期望 06-01，实际 {r2.time.strftime('%m-%d')}"
+    assert r2.time.hour == 9, f"期望 9 点，实际 {r2.time.hour}"
+    print(f"  [通过] 日期绑定后续事件: 买高铁票 -> {r2.time.strftime('%m-%d %H:%M')}")
+
+    print()
+
+
 def test_intent_classifier_import():
     """测试 IntentClassifier 导入和基本接口"""
     print("=" * 50)
@@ -429,6 +483,7 @@ if __name__ == "__main__":
         test_command_parser()
         test_fuzzy_correction()
         test_parse_multiple()
+        test_parse_multiple_real_world()
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()
