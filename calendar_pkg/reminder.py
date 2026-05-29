@@ -16,6 +16,7 @@ class ReminderScheduler:
 
     在后台线程中定期扫描即将触发的事件提醒，
     通过回调通知上层（GUI）显示提醒弹窗。
+    支持按事件分类选择不同音效，以及免打扰时段。
     """
 
     # 默认扫描间隔（秒）
@@ -26,6 +27,10 @@ class ReminderScheduler:
         calendar_manager: CalendarManager,
         on_reminder: Optional[Callable[[CalendarEvent], None]] = None,
         check_interval: int = DEFAULT_CHECK_INTERVAL,
+        reminder_sounds: Optional[dict] = None,
+        dnd_enabled: bool = False,
+        dnd_start: str = "22:00",
+        dnd_end: str = "07:00",
     ):
         """
         初始化提醒调度器
@@ -34,10 +39,18 @@ class ReminderScheduler:
             calendar_manager: 日历管理器实例
             on_reminder: 提醒触发回调（接收 CalendarEvent）
             check_interval: 扫描间隔秒数
+            reminder_sounds: 分类音效映射 {"工作": "bell.wav", ...}
+            dnd_enabled: 是否启用免打扰
+            dnd_start: 免打扰开始时间 (HH:MM)
+            dnd_end: 免打扰结束时间 (HH:MM)
         """
         self._manager = calendar_manager
         self._on_reminder = on_reminder
         self._check_interval = check_interval
+        self._reminder_sounds = reminder_sounds or {}
+        self._dnd_enabled = dnd_enabled
+        self._dnd_start = dnd_start
+        self._dnd_end = dnd_end
 
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
@@ -94,6 +107,10 @@ class ReminderScheduler:
         """检查并触发到期的提醒"""
         now = datetime.now()
 
+        # 免打扰时段检查
+        if self._dnd_enabled and self._is_in_dnd_period(now):
+            return
+
         # 查询未来一段时间内有提醒设置的事件
         upcoming = self._manager.get_pending_reminders(minutes_ahead=60)
 
@@ -134,12 +151,63 @@ class ReminderScheduler:
 
     def _fire_reminder(self, event: CalendarEvent):
         """触发提醒回调"""
-        logger.info(f"触发提醒: {event.title} (提前 {event.reminder_minutes} 分钟)")
+        sound_file = self.get_sound_for_category(event.category)
+        logger.info(
+            f"触发提醒: {event.title} "
+            f"(提前 {event.reminder_minutes} 分钟, "
+            f"分类={event.category}, 音效={sound_file})"
+        )
         if self._on_reminder:
             try:
                 self._on_reminder(event)
             except Exception as e:
                 logger.error(f"提醒回调执行失败: {e}")
+
+    def get_sound_for_category(self, category: str) -> str:
+        """根据事件分类获取对应的提醒音效文件
+
+        Args:
+            category: 事件分类
+
+        Returns:
+            音效文件名
+        """
+        return self._reminder_sounds.get(
+            category, self._reminder_sounds.get("默认", "default.wav")
+        )
+
+    def _is_in_dnd_period(self, now: datetime) -> bool:
+        """判断当前是否在免打扰时段内
+
+        Args:
+            now: 当前时间
+
+        Returns:
+            是否在免打扰时段
+        """
+        try:
+            current_minutes = now.hour * 60 + now.minute
+            start_h, start_m = map(int, self._dnd_start.split(":"))
+            end_h, end_m = map(int, self._dnd_end.split(":"))
+            start_minutes = start_h * 60 + start_m
+            end_minutes = end_h * 60 + end_m
+
+            if start_minutes <= end_minutes:
+                # 同日时段（如 22:00-23:00）
+                return start_minutes <= current_minutes <= end_minutes
+            else:
+                # 跨日时段（如 22:00-07:00）
+                return current_minutes >= start_minutes or current_minutes <= end_minutes
+        except (ValueError, AttributeError):
+            return False
+
+    def update_dnd(self, enabled: bool, start: str = "", end: str = ""):
+        """更新免打扰设置"""
+        self._dnd_enabled = enabled
+        if start:
+            self._dnd_start = start
+        if end:
+            self._dnd_end = end
 
     @staticmethod
     def _make_reminder_key(event: CalendarEvent, now: datetime) -> str:

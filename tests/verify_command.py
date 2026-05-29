@@ -823,6 +823,104 @@ def test_soft_delete_restore():
     print()
 
 
+def test_reminder_sound_and_dnd():
+    """测试个性化提醒音效和免打扰"""
+    print("=" * 50)
+    print("测试个性化提醒与免打扰")
+    print("=" * 50)
+
+    from calendar_pkg.reminder import ReminderScheduler
+    from datetime import datetime
+
+    sounds = {"工作": "bell.wav", "健康": "chime.wav", "默认": "default.wav"}
+    scheduler = ReminderScheduler.__new__(ReminderScheduler)
+    scheduler._reminder_sounds = sounds
+    scheduler._dnd_enabled = True
+    scheduler._dnd_start = "22:00"
+    scheduler._dnd_end = "07:00"
+
+    # 音效映射
+    assert scheduler.get_sound_for_category("工作") == "bell.wav"
+    assert scheduler.get_sound_for_category("健康") == "chime.wav"
+    assert scheduler.get_sound_for_category("其他") == "default.wav"
+    print(f"  [通过] 音效映射: 工作={sounds['工作']}, 健康={sounds['健康']}, 默认={sounds['默认']}")
+
+    # 免打扰时段（跨日：22:00-07:00）
+    assert scheduler._is_in_dnd_period(datetime(2026, 1, 1, 23, 0))  # 23:00 在 DND 内
+    assert scheduler._is_in_dnd_period(datetime(2026, 1, 1, 5, 30))   # 05:30 在 DND 内
+    assert not scheduler._is_in_dnd_period(datetime(2026, 1, 1, 10, 0))  # 10:00 不在 DND
+    assert not scheduler._is_in_dnd_period(datetime(2026, 1, 1, 21, 0))  # 21:00 不在 DND
+    print(f"  [通过] 跨日免打扰: 22:00-07:00")
+
+    # 同日免打扰
+    scheduler._dnd_start = "12:00"
+    scheduler._dnd_end = "14:00"
+    assert scheduler._is_in_dnd_period(datetime(2026, 1, 1, 13, 0))
+    assert not scheduler._is_in_dnd_period(datetime(2026, 1, 1, 15, 0))
+    print(f"  [通过] 同日免打扰: 12:00-14:00")
+
+    print()
+
+
+def test_command_completion():
+    """测试智能补全"""
+    print("=" * 50)
+    print("测试智能补全")
+    print("=" * 50)
+
+    from command.completion import CommandCompleter
+    from command.rule_engine import ParsedCommand, CommandType
+
+    completer = CommandCompleter()
+
+    # 完整指令
+    cmd = ParsedCommand(
+        command_type=CommandType.ADD_EVENT,
+        title="开会",
+        time=datetime.now() + timedelta(days=1),
+    )
+    check = completer.check_completeness(cmd)
+    assert check["complete"] is True
+    print(f"  [通过] 完整指令: complete=True")
+
+    # 缺少时间
+    cmd_no_time = ParsedCommand(
+        command_type=CommandType.ADD_EVENT,
+        title="开会",
+        time=None,
+    )
+    check = completer.check_completeness(cmd_no_time)
+    assert check["complete"] is False
+    assert "time" in check["missing"]
+    assert check["suggestion"] is not None
+    print(f"  [通过] 缺少时间: suggestion='{check['suggestion']}'")
+
+    # 补全后
+    completed = completer.complete_command(cmd_no_time)
+    assert completed.time is not None
+    assert completed.time.hour == 14  # 默认 14:00
+    print(f"  [通过] 补全时间: {completed.time.strftime('%m-%d %H:%M')}")
+
+    # 缺少标题
+    cmd_no_title = ParsedCommand(
+        command_type=CommandType.ADD_EVENT,
+        title="",
+        time=datetime.now(),
+        original_text="原始文本",
+    )
+    completed = completer.complete_command(cmd_no_title)
+    assert completed.title == "原始文本"
+    print(f"  [通过] 补全标题: '{completed.title}'")
+
+    # 非 ADD 指令不补全
+    cmd_query = ParsedCommand(command_type=CommandType.QUERY_EVENT)
+    check = completer.check_completeness(cmd_query)
+    assert check["complete"] is True
+    print(f"  [通过] 非 ADD 指令: 不补全")
+
+    print()
+
+
 def test_intent_classifier_import():
     """测试 IntentClassifier 导入和基本接口"""
     print("=" * 50)
@@ -991,6 +1089,8 @@ if __name__ == "__main__":
         test_past_date_parsing()
         test_backup_export_import()
         test_soft_delete_restore()
+        test_reminder_sound_and_dnd()
+        test_command_completion()
         test_intent_classifier_import()
         test_intent_classifier_inference()
         test_parser_with_intent_model()

@@ -29,6 +29,17 @@ class Config:
         "reminder_enabled": True,
         "reminder_sound": True,
         "reminder_notification": True,
+        # 个性化提醒音效（按事件分类）
+        "reminder_sounds": {
+            "工作": "bell.wav",
+            "健康": "chime.wav",
+            "学习": "soft.wav",
+            "默认": "default.wav",
+        },
+        # 免打扰时段
+        "dnd_enabled": False,
+        "dnd_start": "22:00",  # 免打扰开始时间
+        "dnd_end": "07:00",    # 免打扰结束时间
         # LLM 设置（可选，用于语音指令兜底解析）
         "llm_enabled": False,
         "llm_provider": "ollama",  # ollama/openai

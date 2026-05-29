@@ -22,6 +22,7 @@ from hotkey.hotkey_manager import HotkeyManager
 from calendar_pkg.manager import CalendarManager
 from calendar_pkg.reminder import ReminderScheduler
 from command.parser import CommandParser, CommandType
+from command.completion import CommandCompleter
 from ui.main_window import MainWindow
 from ui.settings_window import SettingsWindow
 from ui.voice_panel import VoiceState
@@ -113,10 +114,17 @@ class VoiceCalendarApp:
             llm_base_url=self.config.get("llm_base_url", "http://localhost:11434"),
         )
 
+        # 指令补全器
+        self._completer = CommandCompleter()
+
         # 提醒调度器
         self._reminder = ReminderScheduler(
             calendar_manager=self._calendar,
             on_reminder=self._on_reminder_triggered,
+            reminder_sounds=self.config.get("reminder_sounds", {}),
+            dnd_enabled=self.config.get("dnd_enabled", False),
+            dnd_start=self.config.get("dnd_start", "22:00"),
+            dnd_end=self.config.get("dnd_end", "07:00"),
         )
 
         logger.info("模块初始化完成")
@@ -308,13 +316,11 @@ class VoiceCalendarApp:
 
     def _execute_add_event(self, command):
         """执行添加事件"""
-        if not command.title:
-            command.title = command.original_text
-        if not command.time:
-            from datetime import datetime, timedelta
-            tomorrow = datetime.now().replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            command.time = tomorrow
-            logger.warning(f"未解析到时间，使用默认值: {command.time}")
+        # 使用补全器检查并补全不完整信息
+        check = self._completer.check_completeness(command)
+        if not check["complete"]:
+            logger.info(f"指令不完整: {check['suggestion']}")
+            command = self._completer.complete_command(command)
 
         self._calendar.add_event(
             title=command.title,
