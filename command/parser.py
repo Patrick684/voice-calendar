@@ -312,10 +312,15 @@ class CommandParser:
         """过滤无效片段：太短、纯时间无事件
 
         例：'午'（单字）、'明天早上'（纯时间）均返回 False
+        例外：含日期引用的纯时间片段（如 '明天'）返回 True，
+              用于日期上下文继承。
         """
         text = text.strip()
         if len(text) <= 1:
             return False
+        # 含日期引用的片段保留（用于日期上下文继承）
+        if self._has_date_reference(text):
+            return True
         # 纯时间片段：移除时间表达式后无实质内容
         _, remaining = self._rule_engine._time_parser.parse(text)
         remaining = re.sub(r"[，,.。！!？?\s]", "", remaining)
@@ -363,18 +368,21 @@ class CommandParser:
         for segment in all_segments:
             # 检测当前片段是否含明确日期引用（明天/后天/X月X号等）
             if self._has_date_reference(segment):
-                # 有日期引用：始终用今天作基准（不走上下文继承）
-                cmd = self.parse(segment)
-                if cmd.time is not None:
-                    current_date = cmd.time.replace(
+                # 先解析提取日期，更新上下文
+                probe_time, _ = self._rule_engine._time_parser.parse(segment)
+                if probe_time is not None:
+                    current_date = probe_time.replace(
                         hour=0, minute=0, second=0, microsecond=0
                     )
+                # 尝试正常解析（可能含事件内容）
+                cmd = self.parse(segment)
             else:
                 # 无日期引用，继承上文日期上下文
                 cmd = self.parse(segment, base_date=current_date)
 
             # 过滤无法识别或标题为空的添加事件
             if cmd.command_type == CommandType.UNKNOWN:
+                # 日期上下文片段（如单独的“明天”）不产生指令
                 logger.debug(f"多指令解析: 忽略无法识别的片段 '{segment}'")
                 continue
             if cmd.command_type == CommandType.ADD_EVENT and not cmd.title:
