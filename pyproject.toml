@@ -9,3 +9,4 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["F841"]
+"scripts/*" = ["E402"]  # 脚本中 sys.stdout.reconfigure 需在第三方库导入前执行

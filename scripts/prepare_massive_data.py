@@ -9,7 +9,6 @@
 
 import gzip
 import json
-import os
 import random
 import sys
 from collections import Counter, defaultdict

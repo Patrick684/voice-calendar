@@ -8,7 +8,6 @@
 """
 
 import json
-import os
 import sys
 import time
 from collections import Counter
@@ -30,7 +29,6 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix,
 )
-import numpy as np
 
 # --- 配置 ---
 MODEL_NAME = "chinese-roberta-wwm-ext"  # 本地目录（由 download.py 下载）
@@ -200,10 +198,10 @@ def train():
     scaler = GradScaler(enabled=FP16 and DEVICE == "cuda")
 
     # 训练循环
-    print(f"\nTraining config:")
+    print("\nTraining config:")
     print(f"  epochs={NUM_EPOCHS}, batch_size={BATCH_SIZE}, lr={LEARNING_RATE}")
     print(f"  max_length={MAX_LENGTH}, warmup_steps={WARMUP_STEPS}, fp16={FP16}")
-    print(f"  weighted_sampler=True, class_weight_loss=True")
+    print("  weighted_sampler=True, class_weight_loss=True")
     print(f"  class_loss_weights={class_loss_weights.tolist()}")
     print(f"  early_stopping_patience={EARLY_STOPPING_PATIENCE} (on F1-macro)")
     print(f"  total_steps={total_steps}")

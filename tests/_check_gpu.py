@@ -16,10 +16,10 @@ try:
         x = torch.randn(1000, 1000).cuda()
         y = torch.randn(1000, 1000).cuda()
         z = torch.mm(x, y)
-        print(f"GPU computation test: PASSED")
+        print("GPU computation test: PASSED")
     else:
         print("CUDA not available. Need to install PyTorch with CUDA support.")
-        print(f"Current PyTorch is CPU-only.")
+        print("Current PyTorch is CPU-only.")
 except ImportError:
     print("PyTorch is NOT installed.")
     print("Need: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121")

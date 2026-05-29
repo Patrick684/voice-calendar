@@ -34,7 +34,7 @@ class CommandParser:
 
     # 规则引擎置信度阈值，低于此值触发 LLM 兆底
     CONFIDENCE_THRESHOLD = 0.5
-    
+
     # 动态置信度阈值（模型意图分类）
     _CALENDAR_INTENT_THRESHOLD = 0.75  # 日历意图较低阈值，减少漏判
     _OTHER_INTENT_THRESHOLD = 0.90     # other 意图较高阈值，减少误判

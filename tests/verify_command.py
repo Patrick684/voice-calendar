@@ -326,7 +326,7 @@ def test_intent_classifier_inference():
     assert set(clf.label_names) == expected_labels, (
         f"标签不匹配: {set(clf.label_names)} vs {expected_labels}"
     )
-    print(f"  [通过] 标签完整性验证")
+    print("  [通过] 标签完整性验证")
 
     # 单条推理测试
     test_cases = [
@@ -351,7 +351,7 @@ def test_intent_classifier_inference():
     for label, conf in results:
         assert 0.0 <= conf <= 1.0, f"置信度越界: {conf}"
         assert label in expected_labels, f"未知标签: {label}"
-    print(f"  [通过] 置信度范围验证")
+    print("  [通过] 置信度范围验证")
 
     print()
 
