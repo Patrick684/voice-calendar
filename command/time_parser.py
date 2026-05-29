@@ -276,7 +276,7 @@ class TimeParser:
 
         # 中文时间: 三点/三点半/三点十五
         match = re.search(
-            r"([一二三四五六七八九十]+)\s*点\s*(半|十五|三十|四十五)?", text
+            r"([一二两三四五六七八九十]+)\s*点\s*(半|十五|三十|四十五)?", text
         )
         if match:
             hour = self._cn_to_int(match.group(1))

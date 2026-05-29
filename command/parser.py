@@ -178,12 +178,16 @@ class CommandParser:
         results: List[ParsedCommand] = []
         for segment in all_segments:
             cmd = self.parse(segment)
-            if cmd.command_type != CommandType.UNKNOWN:
-                results.append(cmd)
-                logger.info(
-                    f"多指令解析: '{segment}' -> {cmd.command_type.value}"
-                )
-            else:
+            # 过滤无法识别或标题为空的添加事件
+            if cmd.command_type == CommandType.UNKNOWN:
                 logger.debug(f"多指令解析: 忽略无法识别的片段 '{segment}'")
+                continue
+            if cmd.command_type == CommandType.ADD_EVENT and not cmd.title:
+                logger.debug(f"多指令解析: 忽略空标题片段 '{segment}'")
+                continue
+            results.append(cmd)
+            logger.info(
+                f"多指令解析: '{segment}' -> {cmd.command_type.value}"
+            )
 
         return results
