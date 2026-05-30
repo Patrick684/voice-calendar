@@ -43,9 +43,12 @@ class CommandParser:
     # 模型意图 -> CommandType 映射
     _INTENT_TO_COMMAND = {
         "add_event": CommandType.ADD_EVENT,
-        "query_event": CommandType.QUERY_EVENT,
+        "add_recurring": CommandType.ADD_EVENT,
         "delete_event": CommandType.DELETE_EVENT,
+        "delete_recurring": CommandType.DELETE_EVENT,
         "update_event": CommandType.UPDATE_EVENT,
+        "update_recurring": CommandType.UPDATE_EVENT,
+        "query_event": CommandType.QUERY_EVENT,
     }
 
     def __init__(
@@ -201,6 +204,7 @@ class CommandParser:
             end_time=rule_result.end_time,
             priority=rule_result.priority,
             recurrence_rule=rule_result.recurrence_rule,
+            recurrence_end=rule_result.recurrence_end,
             original_text=text,
             confidence=confidence,
         )
@@ -262,7 +266,8 @@ class CommandParser:
     def _has_event_content(self, text: str) -> bool:
         """检查文本是否包含事件内容（非纯时间表达式）
 
-        时间词、循环词（每天/每周/每月等）、周引用（这周/下周等）都不算事件内容。
+        时间词、循环词（每天/每周/每月等）、周引用（这周/下周等）、
+        日期号（X号/X日）都不算事件内容。
         """
         _, remaining = self._rule_engine._time_parser.parse(text)
         # 去除标点和空白
@@ -272,6 +277,7 @@ class CommandParser:
             "每天",
             "每日",
             "每周",
+            "每个月",
             "每月",
             "每年",
             "每个工作日",
@@ -283,6 +289,9 @@ class CommandParser:
         ]
         for word in recurrence_words:
             remaining = remaining.replace(word, "")
+        # 去除"X号"/"X日"日期引用
+        remaining = re.sub(r"\d{1,2}\s*[号日]", "", remaining)
+        remaining = re.sub(r"[一二三四五六七八九十]+\s*[号日]", "", remaining)
         return len(remaining) > 0
 
     def _split_by_time_triggers(self, segment: str) -> list:
