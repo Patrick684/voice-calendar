@@ -1,4 +1,5 @@
 from .whisper_engine import WhisperEngine as WhisperEngine
+from .paraformer_engine import ParaformerEngine as ParaformerEngine
 from .hotword_manager import HotwordManager as HotwordManager
 from .punctuation_processor import PunctuationProcessor as PunctuationProcessor
 from .punctuation_restorer import PunctuationRestorer as PunctuationRestorer

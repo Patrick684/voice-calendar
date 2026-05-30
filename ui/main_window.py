@@ -15,7 +15,8 @@ from calendar_pkg.achievement import AchievementEngine
 from ui.voice_panel import VoicePanel, VoiceState
 from ui.event_dialog import EventDialog
 from ui.stats_view import StatsView
-from ui.time_dial import TimeDial
+from ui.time_wheel import TimeWheel
+from ui.query_window import QueryWindow
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,12 @@ class MainWindow(ctk.CTk):
             "start_x": 0,
             "start_y": 0,
             "dragging": False,
+            "long_press_id": None,
         }
         self._day_cells: Dict[str, ctk.CTkButton] = {}  # date_str -> cell widget
+        self._ghost = None  # 拖拽时的浮动幽灵卡片
+        self._drag_hover_date: Optional[str] = None  # 拖拽悬停的日期
+        self._drag_hover_timer = None  # 悬停高亮延迟定时器
 
         # 撤销栈
         self._undo_stack: deque = deque(maxlen=20)
@@ -85,6 +90,9 @@ class MainWindow(ctk.CTk):
 
         # 当前选中的事件（用于拨盘）
         self._active_event: Optional[CalendarEvent] = None
+
+        # 查询结果窗口引用
+        self._query_window: Optional[QueryWindow] = None
 
         # 分类颜色（从配置获取，使用默认值）
         self._category_colors: Dict[str, str] = {
@@ -234,6 +242,16 @@ class MainWindow(ctk.CTk):
         )
         self._event_list_label.pack(padx=10, pady=(10, 5), anchor="w")
 
+        # 优先级关键词提示（仅优先级排序模式下显示）
+        self._priority_hint_label = ctk.CTkLabel(
+            self._event_frame,
+            text='语音关键词:  "紧急" → 高优  |  "重要" → 中优',
+            font=ctk.CTkFont(size=11),
+            text_color="#888888",
+        )
+        # 初始隐藏（时间排序模式）
+        self._priority_hint_label.pack_forget()
+
         # 事件滚动列表
         self._event_scroll = ctk.CTkScrollableFrame(self._event_frame)
         self._event_scroll.pack(fill="both", expand=True, padx=10, pady=5)
@@ -335,11 +353,14 @@ class MainWindow(ctk.CTk):
         )
         cell.grid(row=row, column=col, sticky="nsew", padx=1, pady=1)
 
-        # 拖拽放置目标（视觉反馈）
-        cell.bind("<Enter>", lambda e, ds=date_str: self._on_drag_enter(ds))
-        cell.bind("<Leave>", lambda e, ds=date_str: self._on_drag_leave(ds))
-
         self._day_cells[date_str] = cell
+
+    # 优先级分组定义：(priority_value, label, color)
+    _PRIORITY_GROUPS = [
+        (2, "❗ 紧急", "#e74c3c"),
+        (1, "★ 重要", "#e67e22"),
+        (0, "○ 普通", "#95a5a6"),
+    ]
 
     def _setup_event_list_for_date(self, date_str: str):
         """刷新指定日期的事件列表（支持排序模式）"""
@@ -352,6 +373,9 @@ class MainWindow(ctk.CTk):
             self._event_scroll._parent_canvas.yview_moveto(0)
         except Exception:
             pass
+
+        # 清空分组 widget 引用
+        self._priority_group_widgets = {}
 
         try:
             date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -377,11 +401,46 @@ class MainWindow(ctk.CTk):
             self._empty_label.pack(pady=20)
             return
 
-        for event in events:
-            self._create_event_card(event)
+        if self._sort_mode == "priority":
+            self._render_priority_groups(events)
+        else:
+            for event in events:
+                self._create_event_card(event)
 
-        # 显示时间拨盘
-        self._update_time_dial()
+    def _render_priority_groups(self, events):
+        """按优先级分组渲染事件列表（含分组标题）"""
+        # 将事件按优先级归类
+        grouped = {}
+        for event in events:
+            # priority >= 2 归入紧急，1=重要，0=普通
+            level = min(event.priority, 2)
+            grouped.setdefault(level, []).append(event)
+
+        for priority_val, label, color in self._PRIORITY_GROUPS:
+            group_events = grouped.get(priority_val, [])
+
+            # 分组标题（即使无事件也显示，方便拖入）
+            header = ctk.CTkFrame(self._event_scroll, fg_color="transparent", height=28)
+            header.pack(fill="x", pady=(8, 2), padx=5)
+            header.pack_propagate(False)
+
+            # 左侧色块
+            ctk.CTkFrame(header, width=4, fg_color=color, corner_radius=2).pack(side="left", fill="y", padx=(0, 8))
+
+            # 分组文字
+            ctk.CTkLabel(
+                header,
+                text=f"{label} ({len(group_events)})",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color=color,
+            ).pack(side="left", anchor="w")
+
+            # 记录分组 widget 供拖拽判定使用
+            self._priority_group_widgets[priority_val] = header
+
+            # 渲染组内事件卡片
+            for event in group_events:
+                self._create_event_card(event)
 
     def _create_event_card(self, event: CalendarEvent):
         """创建事件卡片（含分类颜色条 + 左键拖拽）"""
@@ -450,12 +509,6 @@ class MainWindow(ctk.CTk):
                 text_color=cat_color,
                 anchor="w",
             ).pack(fill="x", padx=10, pady=(0, 5))
-
-        # 选中事件 → 更新拨盘（单击左侧颜色条区域选中）
-        color_bar.bind(
-            "<Button-1>",
-            lambda e, ev=event: self._select_event(ev),
-        )
 
         # 右键菜单（快捷编辑）
         if event.id is not None:
@@ -554,26 +607,31 @@ class MainWindow(ctk.CTk):
         self._refresh_calendar()
 
     # ================================================================
-    # 拖拽排序（左键 + 移动阈值）
+    # 拖拽排序（左键 + 移动阈值 + 浮动幽灵卡片）
     # ================================================================
 
     _DRAG_THRESHOLD = 5  # 像素阈值，超过才算拖拽
+    _GHOST_NORMAL_SIZE = (200, 55)  # 幽灵卡片正常大小
+    _GHOST_SHRINK_SIZE = (140, 38)  # 缩小后大小
 
     def _on_press(self, event, cal_event: CalendarEvent):
-        """左键按下 - 记录起始位置，绑定全局拖拽事件"""
+        """左键按下 - 记录起始位置，绑定全局拖拽事件，启动长按定时器"""
         self._drag_data = {
             "event": cal_event,
             "source_date": cal_event.start_time.strftime("%Y-%m-%d"),
             "start_x": event.x_root,
             "start_y": event.y_root,
             "dragging": False,
+            "long_press_id": None,
         }
+        # 启动长按定时器（500ms）
+        self._drag_data["long_press_id"] = self.after(500, lambda: self._on_long_press(event, cal_event))
         # 绑定全局事件（确保在离开原始 widget 后仍能捕获运动和释放）
         self._drag_motion_id = self.bind_all("<B1-Motion>", self._on_motion, add="+")
         self._drag_release_id = self.bind_all("<ButtonRelease-1>", self._on_global_release, add="+")
 
     def _on_motion(self, event):
-        """左键拖拽中 - 超过阈值进入拖拽模式"""
+        """左键拖拽中 - 超过阈值进入拖拽模式，创建幽灵卡片跟随鼠标"""
         if self._drag_data.get("event") is None:
             return
         if not self._drag_data["dragging"]:
@@ -581,11 +639,31 @@ class MainWindow(ctk.CTk):
             dy = abs(event.y_root - self._drag_data["start_y"])
             if dx + dy < self._DRAG_THRESHOLD:
                 return
+            # 取消长按定时器
+            if self._drag_data.get("long_press_id"):
+                self.after_cancel(self._drag_data["long_press_id"])
+                self._drag_data["long_press_id"] = None
             # 进入拖拽模式
             self._drag_data["dragging"] = True
             source_cell = self._day_cells.get(self._drag_data["source_date"])
             if source_cell:
                 source_cell.configure(fg_color="#e67e22")
+            # 创建幽灵卡片
+            self._create_drag_ghost(self._drag_data["event"], event.x_root, event.y_root)
+        else:
+            # 拖拽进行中：更新幽灵卡片位置
+            if hasattr(self, "_ghost") and self._ghost:
+                self._ghost.geometry(f"+{event.x_root + 12}+{event.y_root + 12}")
+                # 检测是否在事件卡片区域外（靠近日历区域时缩小）
+                if self._is_outside_card_area(event):
+                    w, h = self._GHOST_SHRINK_SIZE
+                else:
+                    w, h = self._GHOST_NORMAL_SIZE
+                self._ghost.geometry(f"{w}x{h}+{event.x_root + 12}+{event.y_root + 12}")
+            # 主动检测鼠标悬停的日期格子（<Enter>/<Leave> 在全局拖拽时不触发）
+            self._detect_drag_hover(event)
+            # 优先级排序模式下检测分组悬停高亮
+            self._detect_priority_group_hover(event)
 
     def _on_global_release(self, event):
         """全局释放处理（先解绑全局事件，再判断放置目标）"""
@@ -599,15 +677,49 @@ class MainWindow(ctk.CTk):
         if not self._drag_data.get("event"):
             return
 
+        # 取消长按定时器
+        if self._drag_data.get("long_press_id"):
+            self.after_cancel(self._drag_data["long_press_id"])
+            self._drag_data["long_press_id"] = None
+
+        # 如果长按已经触发了时间滚轮，直接清理状态
+        if self._drag_data.get("long_press_fired"):
+            self._drag_data = {
+                "event": None,
+                "source_date": None,
+                "start_x": 0,
+                "start_y": 0,
+                "dragging": False,
+                "long_press_id": None,
+            }
+            return
+
         cal_event = self._drag_data["event"]
 
         if self._drag_data.get("dragging"):
+            # 销毁幽灵卡片
+            self._destroy_drag_ghost()
+            # 清除悬停高亮
+            self._clear_drag_hover()
+            # 清除优先级分组高亮
+            self._clear_priority_hover()
+
+            # 优先级排序模式下：检查是否释放在事件列表区域（调整优先级）
+            if self._sort_mode == "priority" and self._try_priority_drop(event, cal_event):
+                self._drag_data = {
+                    "event": None,
+                    "source_date": None,
+                    "start_x": 0,
+                    "start_y": 0,
+                    "dragging": False,
+                    "long_press_id": None,
+                }
+                return
+
             # 拖拽模式：检查释放位置是否在日期格子上
-            # 通过遍历日期格子检查光标位置
             dropped = False
             for date_str, cell in self._day_cells.items():
                 try:
-                    # 获取日期格子的屏幕坐标范围
                     cell.update_idletasks()
                     x1 = cell.winfo_rootx()
                     y1 = cell.winfo_rooty()
@@ -630,34 +742,297 @@ class MainWindow(ctk.CTk):
                 "start_x": 0,
                 "start_y": 0,
                 "dragging": False,
+                "long_press_id": None,
             }
         else:
-            # 点击模式：选中事件（显示时间拨盘）
+            # 点击模式（非拖拽、非长按）- 打开编辑对话框
             self._drag_data = {
                 "event": None,
                 "source_date": None,
                 "start_x": 0,
                 "start_y": 0,
                 "dragging": False,
+                "long_press_id": None,
             }
-            self._select_event(cal_event)
+            self._open_event_dialog(cal_event)
 
-    def _on_drag_enter(self, date_str: str):
-        """拖拽进入日期格子"""
+    def _create_drag_ghost(self, cal_event: CalendarEvent, x: int, y: int):
+        """创建跟随鼠标的浮动幽灵卡片"""
+        import tkinter as tk
+
+        self._ghost = tk.Toplevel(self)
+        self._ghost.overrideredirect(True)
+        self._ghost.attributes("-alpha", 0.85)
+        self._ghost.attributes("-topmost", True)
+        w, h = self._GHOST_NORMAL_SIZE
+        self._ghost.geometry(f"{w}x{h}+{x + 12}+{y + 12}")
+        self._ghost.configure(bg="#34495e", highlightthickness=0, bd=0)
+
+        # 简化卡片内容
+        time_str = "全天" if cal_event.is_all_day else cal_event.start_time.strftime("%H:%M")
+        title = cal_event.title
+        if len(title) > 12:
+            title = title[:12] + "..."
+
+        frame = tk.Frame(self._ghost, bg="#34495e", padx=8, pady=6, highlightthickness=0, bd=0)
+        frame.pack(fill="both", expand=True)
+
+        # 分类颜色条
+        cat_color = self._category_colors.get(cal_event.category, "#757575")
+        tk.Frame(frame, bg=cat_color, width=3, highlightthickness=0, bd=0).pack(side="left", fill="y", padx=(0, 6))
+
+        # 文字内容
+        text_frame = tk.Frame(frame, bg="#34495e", highlightthickness=0, bd=0)
+        text_frame.pack(side="left", fill="both", expand=True)
+        tk.Label(
+            text_frame,
+            text=f"{time_str}  {title}",
+            bg="#34495e",
+            fg="white",
+            font=("Microsoft YaHei UI", 10),
+            anchor="w",
+            highlightthickness=0,
+            bd=0,
+        ).pack(anchor="w")
+        tk.Label(
+            text_frame,
+            text="拖拽到目标日期释放",
+            bg="#34495e",
+            fg="#95a5a6",
+            font=("Microsoft YaHei UI", 8),
+            anchor="w",
+            highlightthickness=0,
+            bd=0,
+        ).pack(anchor="w")
+
+    def _destroy_drag_ghost(self):
+        """销毁幽灵卡片"""
+        if hasattr(self, "_ghost") and self._ghost:
+            try:
+                self._ghost.destroy()
+            except Exception:
+                pass
+            self._ghost = None
+
+    def _is_outside_card_area(self, event) -> bool:
+        """检测鼠标是否在事件卡片区域外（靠近日历区域时返回 True）"""
+        try:
+            # 事件列表区域的屏幕坐标
+            self._event_frame.update_idletasks()
+            ef_x1 = self._event_frame.winfo_rootx()
+            ef_x2 = ef_x1 + self._event_frame.winfo_width()
+            ef_y1 = self._event_frame.winfo_rooty()
+            ef_y2 = ef_y1 + self._event_frame.winfo_height()
+            # 鼠标不在事件列表区域内
+            return not (ef_x1 <= event.x_root <= ef_x2 and ef_y1 <= event.y_root <= ef_y2)
+        except Exception:
+            return False
+
+    def _detect_drag_hover(self, event):
+        """主动检测拖拽时鼠标悬停的日期格子（替代 <Enter>/<Leave>）
+
+        停留 150ms 后高亮目标日期格子，离开时恢复。
+        """
         if not self._drag_data.get("dragging"):
+            return
+
+        # 遍历日期格子，检测鼠标在哪个格子上
+        hovered_date = None
+        for date_str, cell in self._day_cells.items():
+            try:
+                x1 = cell.winfo_rootx()
+                y1 = cell.winfo_rooty()
+                x2 = x1 + cell.winfo_width()
+                y2 = y1 + cell.winfo_height()
+                if x1 <= event.x_root <= x2 and y1 <= event.y_root <= y2:
+                    hovered_date = date_str
+                    break
+            except Exception:
+                continue
+
+        # 跳过源日期
+        if hovered_date == self._drag_data.get("source_date"):
+            hovered_date = None
+
+        # 与上一次悬停位置比较
+        if hovered_date == self._drag_hover_date:
+            return  # 没变化，无需处理
+
+        # 离开旧格子 → 恢复颜色
+        if self._drag_hover_date:
+            self._restore_cell_color(self._drag_hover_date)
+            # 取消尚未触发的高亮定时器
+            if self._drag_hover_timer:
+                self.after_cancel(self._drag_hover_timer)
+                self._drag_hover_timer = None
+
+        # 进入新格子 → 延迟 150ms 后高亮
+        self._drag_hover_date = hovered_date
+        if hovered_date:
+            self._drag_hover_timer = self.after(150, lambda ds=hovered_date: self._highlight_hover_cell(ds))
+
+    def _highlight_hover_cell(self, date_str: str):
+        """延迟后高亮悬停的目标日期格子"""
+        # 再次确认仍在拖拽中且悬停位置没变
+        if not self._drag_data.get("dragging"):
+            return
+        if self._drag_hover_date != date_str:
             return
         cell = self._day_cells.get(date_str)
         if cell:
-            cell.configure(fg_color="#27ae60")
+            cell.configure(fg_color="#3498db", text_color="white")
 
-    def _on_drag_leave(self, date_str: str):
-        """拖拽离开日期格子"""
-        if not self._drag_data.get("dragging"):
+    def _restore_cell_color(self, date_str: str):
+        """恢复单个日期格子的原始颜色"""
+        cell = self._day_cells.get(date_str)
+        if not cell:
             return
-        self._refresh_calendar()
+        today = datetime.now()
+        try:
+            day_num = int(date_str.split("-")[2])
+        except (IndexError, ValueError):
+            day_num = 0
+        is_today = today.year == self._view_year and today.month == self._view_month and today.day == day_num
+        is_selected = self._selected_date.strftime("%Y-%m-%d") == date_str
+        if is_selected:
+            bg = "#3498db"
+            fg = "white"
+        elif is_today:
+            bg = "#2ecc71"
+            fg = "white"
+        else:
+            bg = "#f0f0f0"
+            fg = "#333333"
+        cell.configure(fg_color=bg, text_color=fg)
+
+    def _clear_drag_hover(self):
+        """清除拖拽悬停状态"""
+        if self._drag_hover_timer:
+            self.after_cancel(self._drag_hover_timer)
+            self._drag_hover_timer = None
+        if self._drag_hover_date:
+            self._restore_cell_color(self._drag_hover_date)
+            self._drag_hover_date = None
+
+    # ================================================================
+    # 优先级拖拽调整
+    # ================================================================
+
+    def _try_priority_drop(self, event, cal_event: CalendarEvent) -> bool:
+        """尝试将卡片释放到优先级分组区域，成功则修改优先级并返回 True"""
+        if not hasattr(self, "_priority_group_widgets") or not self._priority_group_widgets:
+            return False
+
+        # 检测释放坐标落在哪个分组标题所属区域
+        target_priority = self._detect_priority_group_at(event.x_root, event.y_root)
+        if target_priority is None:
+            return False
+
+        # 与当前优先级相同则不修改
+        current_level = min(cal_event.priority, 2)
+        if target_priority == current_level:
+            return False
+
+        # 记录撤销
+        self._undo_stack.append(
+            {
+                "event_id": cal_event.id,
+                "old_start": cal_event.start_time,
+                "old_end": cal_event.end_time,
+                "old_priority": cal_event.priority,
+            }
+        )
+
+        # 更新优先级
+        self._manager.update_event(cal_event.id, priority=target_priority)
+        logger.info(f"优先级调整: {cal_event.title} {current_level} -> {target_priority}")
+
+        # 刷新视图
+        self.navigate_to_date(cal_event.start_time)
+        return True
+
+    def _detect_priority_group_at(self, root_x: int, root_y: int):
+        """根据绝对坐标判断落在哪个优先级分组区域内
+
+        分组区域定义：每个分组标题到下一个分组标题之间的区域属于该组。
+        """
+        if not hasattr(self, "_priority_group_widgets") or not self._priority_group_widgets:
+            return None
+
+        # 先检查是否在事件列表滚动区域内
+        try:
+            scroll_x = self._event_scroll.winfo_rootx()
+            scroll_y = self._event_scroll.winfo_rooty()
+            scroll_x2 = scroll_x + self._event_scroll.winfo_width()
+            scroll_y2 = scroll_y + self._event_scroll.winfo_height()
+            if not (scroll_x <= root_x <= scroll_x2 and scroll_y <= root_y <= scroll_y2):
+                return None
+        except Exception:
+            return None
+
+        # 根据 y 坐标确定所属分组
+        # 各分组标题的 y 坐标（从上到下：紧急 → 重要 → 普通）
+        group_positions = []
+        for priority_val, header in self._priority_group_widgets.items():
+            try:
+                hy = header.winfo_rooty()
+                group_positions.append((hy, priority_val))
+            except Exception:
+                continue
+
+        if not group_positions:
+            return None
+
+        # 按 y 坐标排序
+        group_positions.sort(key=lambda x: x[0])
+
+        # 找到释放点落在哪两个标题之间
+        target = group_positions[-1][1]  # 默认最后一组
+        for i, (gy, pv) in enumerate(group_positions):
+            if root_y < gy:
+                # 在第一个标题上方 → 归入第一组
+                target = group_positions[max(0, i - 1)][1] if i > 0 else group_positions[0][1]
+                break
+            target = pv
+
+        return target
+
+    def _detect_priority_group_hover(self, event):
+        """拖拽期间检测鼠标悬停的优先级分组并高亮"""
+        if self._sort_mode != "priority":
+            return
+        if not hasattr(self, "_priority_group_widgets") or not self._priority_group_widgets:
+            return
+
+        hovered = self._detect_priority_group_at(event.x_root, event.y_root)
+
+        # 与上次相同则不处理
+        prev = getattr(self, "_priority_hover_group", None)
+        if hovered == prev:
+            return
+
+        # 恢复上一个高亮
+        if prev is not None and prev in self._priority_group_widgets:
+            self._priority_group_widgets[prev].configure(fg_color="transparent")
+
+        self._priority_hover_group = hovered
+
+        # 高亮新的分组标题
+        if hovered is not None and hovered in self._priority_group_widgets:
+            # 用分组对应颜色的浅色版本作为高亮背景
+            color_map = {2: "#fadbd8", 1: "#fdebd0", 0: "#eaeded"}
+            self._priority_group_widgets[hovered].configure(fg_color=color_map.get(hovered, "#eaeded"))
+
+    def _clear_priority_hover(self):
+        """清除优先级分组悬停高亮"""
+        prev = getattr(self, "_priority_hover_group", None)
+        if prev is not None and hasattr(self, "_priority_group_widgets"):
+            if prev in self._priority_group_widgets:
+                self._priority_group_widgets[prev].configure(fg_color="transparent")
+        self._priority_hover_group = None
 
     def _on_drag_drop(self, target_date_str: str):
-        """拖拽放置到目标日期"""
+        """拖拽放置到目标日期（含高亮确认动画）"""
         if not self._drag_data.get("dragging"):
             return
 
@@ -667,6 +1042,7 @@ class MainWindow(ctk.CTk):
 
         source_date_str = self._drag_data["source_date"]
         if source_date_str == target_date_str:
+            self._refresh_calendar()
             return
 
         try:
@@ -708,31 +1084,46 @@ class MainWindow(ctk.CTk):
             "start_x": 0,
             "start_y": 0,
             "dragging": False,
+            "long_press_id": None,
         }
-        self._refresh_calendar()
-        self._refresh_event_list()
+
+        # 导航到目标日期 + 高亮确认动画（金色闪烁 800ms）
+        self.navigate_to_date(target_date)
+        cell = self._day_cells.get(target_date_str)
+        if cell:
+            cell.configure(fg_color="#f1c40f", text_color="#2c3e50")
+            self.after(800, self._refresh_calendar)
 
     def _toggle_sort_mode(self):
         """切换排序模式"""
         if self._sort_mode == "time":
             self._sort_mode = "priority"
             self._sort_btn.configure(text="★ 优先级排序")
+            self._priority_hint_label.pack(
+                padx=10,
+                pady=(0, 5),
+                anchor="w",
+                after=self._event_list_label,
+            )
         else:
             self._sort_mode = "time"
             self._sort_btn.configure(text="⏱ 时间排序")
+            self._priority_hint_label.pack_forget()
         self._refresh_event_list()
 
     def _on_undo(self, event=None):
-        """Ctrl+Z 撤销上次拖拽/拨盘"""
+        """Ctrl+Z 撤销上次拖拽/拨盘/优先级调整"""
         if not self._undo_stack:
             return
         action = self._undo_stack.pop()
         try:
-            self._manager.update_event(
-                action["event_id"],
-                start_time=action["old_start"],
-                end_time=action.get("old_end"),
-            )
+            update_kwargs = {
+                "start_time": action["old_start"],
+                "end_time": action.get("old_end"),
+            }
+            if "old_priority" in action:
+                update_kwargs["priority"] = action["old_priority"]
+            self._manager.update_event(action["event_id"], **update_kwargs)
             logger.info(f"撤销: event_id={action['event_id']}")
             self._refresh_calendar()
             self._refresh_event_list()
@@ -740,44 +1131,52 @@ class MainWindow(ctk.CTk):
             logger.error(f"撤销失败: {e}")
 
     # ================================================================
-    # 时间拨盘
+    # 长按时间调整（纵向滚轮弹窗）
     # ================================================================
 
-    def _setup_time_dial(self):
-        """在事件列表底部初始化时间拨盘"""
-        self._time_dial = TimeDial(
-            self._event_frame,
-            on_time_change=self._on_time_dial_change,
+    def _on_long_press(self, event, cal_event: CalendarEvent):
+        """长按触发 - 弹出时间滚轮小窗"""
+        # 确认仍在按下状态（未进入拖拽、未释放）
+        if self._drag_data.get("dragging"):
+            return
+        if self._drag_data.get("event") != cal_event:
+            return
+
+        # 清除长按标记（避免释放时重复处理）
+        self._drag_data["long_press_id"] = None
+        self._drag_data["long_press_fired"] = True
+
+        # 解绑全局事件（长按已触发，不再需要拖拽/释放检测）
+        try:
+            self.unbind_all("<B1-Motion>")
+            self.unbind_all("<ButtonRelease-1>")
+        except Exception:
+            pass
+
+        # 仅非全天事件可调整时间
+        if cal_event.is_all_day or cal_event.id is None:
+            return
+
+        # 弹出时间滚轮
+        self._active_event = cal_event
+        hour = cal_event.start_time.hour
+        minute = cal_event.start_time.minute
+
+        # 定位在鼠标附近
+        x = event.x_root + 15
+        y = event.y_root + 15
+
+        TimeWheel(
+            self,
+            hour=hour,
+            minute=minute,
+            on_time_confirm=self._on_time_wheel_confirm,
+            x=x,
+            y=y,
         )
-        # 默认隐藏，选中事件后显示
-        self._time_dial_visible = False
 
-    def _update_time_dial(self):
-        """根据当前选中事件更新拨盘显示"""
-        if not hasattr(self, "_time_dial"):
-            self._setup_time_dial()
-
-        if self._active_event and self._active_event.id is not None:
-            if not self._time_dial_visible:
-                self._time_dial.pack(fill="x", padx=10, pady=(0, 5))
-                self._time_dial_visible = True
-            self._time_dial.set_event(
-                self._active_event.id,
-                self._active_event.start_time,
-            )
-        else:
-            if self._time_dial_visible:
-                self._time_dial.pack_forget()
-                self._time_dial_visible = False
-            self._time_dial.clear()
-
-    def _select_event(self, event: CalendarEvent):
-        """选中事件，更新拨盘"""
-        self._active_event = event
-        self._update_time_dial()
-
-    def _on_time_dial_change(self, hour: int, minute: int):
-        """拨盘时间变更回调"""
+    def _on_time_wheel_confirm(self, hour: int, minute: int):
+        """时间滚轮确认回调"""
         if self._active_event is None or self._active_event.id is None:
             return
 
@@ -804,8 +1203,10 @@ class MainWindow(ctk.CTk):
             start_time=new_start,
             end_time=new_end,
         )
-        logger.info(f"拨盘调整: {self._active_event.title} → {hour:02d}:{minute:02d}")
-        self._refresh_event_list()
+        logger.info(f"时间滚轮调整: {self._active_event.title} → {hour:02d}:{minute:02d}")
+        # 导航到事件所在日期（刷新视图显示更新后的时间）
+        self.navigate_to_date(new_start)
+        self._active_event = None
 
     # ================================================================
     # 事件处理
@@ -873,8 +1274,13 @@ class MainWindow(ctk.CTk):
                 # 添加模式
                 self._manager.add_event(**data)
                 logger.info(f"事件已添加: {data['title']}")
-            self._refresh_calendar()
-            self._refresh_event_list()
+            # 导航到事件所在日期
+            target_date = data.get("start_time")
+            if target_date:
+                self.navigate_to_date(target_date)
+            else:
+                self._refresh_calendar()
+                self._refresh_event_list()
 
         def on_delete(event_id: int):
             title = self._manager.delete_event(event_id)
@@ -923,10 +1329,44 @@ class MainWindow(ctk.CTk):
         """显示语音识别结果"""
         self._voice_panel.set_result(text)
 
+    def navigate_to_date(self, target_date: datetime):
+        """导航到指定日期并刷新视图（公共接口）
+
+        自动切换年月、选中目标日期、刷新日历和事件列表。
+        """
+        self._view_year = target_date.year
+        self._view_month = target_date.month
+        self._selected_date = target_date
+        self._refresh_calendar()
+        self._refresh_event_list()
+
     def refresh_all(self):
         """刷新所有视图"""
         self._refresh_calendar()
         self._refresh_event_list()
+
+    def show_query_window(self, title: str, events: list):
+        """打开或复用查询结果窗口（贴主窗口左侧）"""
+        if self._query_window and self._query_window.winfo_exists():
+            self._query_window.update_results(title, events)
+            self._query_window.focus()
+        else:
+            self._query_window = QueryWindow(self, title, events)
+        # 定位到主窗口左侧贴边
+        self._position_query_window()
+
+    def _position_query_window(self):
+        """将查询窗口定位到主窗口左侧贴边"""
+        if not self._query_window or not self._query_window.winfo_exists():
+            return
+        self.update_idletasks()
+        x = self.winfo_x() - 290
+        y = self.winfo_y()
+        h = self.winfo_height()
+        # 防止窗口跑到屏幕外
+        if x < 0:
+            x = 0
+        self._query_window.geometry(f"280x{h}+{x}+{y}")
 
     def show_reminder(self, event: CalendarEvent):
         """显示事件提醒弹窗"""

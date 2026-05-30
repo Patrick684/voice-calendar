@@ -15,6 +15,7 @@ if not os.environ.get("HF_ENDPOINT"):
 from config import Config
 from audio.recorder import AudioRecorder
 from engine.whisper_engine import WhisperEngine
+from engine.paraformer_engine import ParaformerEngine
 from engine.hotword_manager import HotwordManager
 from engine.punctuation_processor import PunctuationProcessor
 from engine.punctuation_restorer import PunctuationRestorer
@@ -77,12 +78,21 @@ class VoiceCalendarApp:
             default_reminder_minutes=self.config.get("default_reminder_minutes", 15),
         )
 
-        # 语音识别引擎
-        self._whisper = WhisperEngine(
-            model_size=self.config.get("model_size", "small"),
-            compute_type=self.config.get("compute_type", "int8"),
-            cache_dir=str(self.config.model_cache_dir),
-        )
+        # 语音识别引擎（根据配置选择 Paraformer 或 Whisper）
+        asr_engine = self.config.get("asr_engine", "paraformer")
+        if asr_engine == "paraformer":
+            self._asr = ParaformerEngine(
+                device="cuda:0",
+                cache_dir=str(self.config.model_cache_dir),
+            )
+            logger.info("ASR 引擎: Paraformer (GPU)")
+        else:
+            self._asr = WhisperEngine(
+                model_size=self.config.get("model_size", "small"),
+                compute_type=self.config.get("compute_type", "int8"),
+                cache_dir=str(self.config.model_cache_dir),
+            )
+            logger.info("ASR 引擎: Whisper (CPU)")
 
         # 后处理链
         self._text_corrector = TextCorrector()
@@ -178,7 +188,7 @@ class VoiceCalendarApp:
         """后台线程：加载 Whisper 模型"""
         try:
             logger.info("正在加载语音识别模型...")
-            self._whisper.load_model()
+            self._asr.load_model()
             logger.info("模型加载完成")
         except Exception as e:
             logger.error(f"模型加载失败: {e}")
@@ -236,7 +246,7 @@ class VoiceCalendarApp:
         try:
             # 1. 语音识别
             initial_prompt = self._hotword_manager.build_initial_prompt()
-            text = self._whisper.transcribe(
+            text = self._asr.transcribe(
                 audio,
                 language=self.config.get("language", "zh"),
                 initial_prompt=initial_prompt,
@@ -399,7 +409,7 @@ class VoiceCalendarApp:
             msg += f" | 🏆 解锁成就: {ach_names}"
             logger.info(f"成就解锁: {ach_names}")
 
-        self._result_queue.put(("command_executed", msg, "add"))
+        self._result_queue.put(("command_executed", msg, "add", command.time))
 
     def _execute_delete_event(self, command):
         """执行删除事件（查找匹配的事件并删除）"""
@@ -423,13 +433,13 @@ class VoiceCalendarApp:
                     deleted_count += 1
             date_str = command.time.strftime("%m月%d日")
             msg = f"已删除 {date_str} 的 {deleted_count} 个事件"
-            self._result_queue.put(("command_executed", msg, "delete"))
+            self._result_queue.put(("command_executed", msg, "delete", None))
         else:
             # 删除第一个匹配的事件
             title = self._calendar.delete_event(events[0].id)
             if title:
                 msg = f"已删除: {title}"
-                self._result_queue.put(("command_executed", msg, "delete"))
+                self._result_queue.put(("command_executed", msg, "delete", None))
             else:
                 self._result_queue.put(("voice_state", VoiceState.ERROR, "删除失败"))
 
@@ -448,7 +458,7 @@ class VoiceCalendarApp:
         else:
             msg = f"{date_str}没有事件"
 
-        self._result_queue.put(("command_executed", msg, "query"))
+        self._result_queue.put(("command_executed", msg, "query", (date_str, events)))
 
     def _execute_update_event(self, command):
         """执行修改事件
@@ -544,7 +554,7 @@ class VoiceCalendarApp:
             new_time_str = update_kwargs["start_time"].strftime("%m月%d日 %H:%M")
             msg = f"已修改: {target_event.title} → {new_time_str}"
             logger.info(msg)
-            self._result_queue.put(("command_executed", msg, "update"))
+            self._result_queue.put(("command_executed", msg, "update", None))
         else:
             self._result_queue.put(("voice_state", VoiceState.ERROR, "修改失败"))
 
@@ -623,9 +633,19 @@ class VoiceCalendarApp:
 
         elif msg_type == "command_executed":
             message = result[1]
+            cmd_action = result[2] if len(result) > 2 else None
+            event_time = result[3] if len(result) > 3 else None
             self._main_window.show_voice_result(message)
             self._main_window.set_voice_state(VoiceState.SUCCESS, message)
-            self._main_window.refresh_all()
+            # 添加事件后导航到对应日期
+            if cmd_action == "add" and event_time:
+                self._main_window.navigate_to_date(event_time)
+            elif cmd_action == "query" and event_time:
+                # 打开独立查询结果窗口
+                query_title, query_events = event_time
+                self._main_window.show_query_window(query_title, query_events)
+            else:
+                self._main_window.refresh_all()
 
     def _open_settings(self):
         """打开设置窗口"""
@@ -647,9 +667,9 @@ class VoiceCalendarApp:
                 self.config.get("hotkey_mode", "hold"),
             )
 
-        if "model_size" in changes:
+        if "model_size" in changes and hasattr(self._asr, "change_model"):
             threading.Thread(
-                target=self._whisper.change_model,
+                target=self._asr.change_model,
                 args=(changes["model_size"],),
                 daemon=True,
             ).start()
