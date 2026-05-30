@@ -398,7 +398,19 @@ class MainWindow(ctk.CTk):
         content.pack(side="left", fill="both", expand=True)
 
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
-        title_text = f"{time_str}  {event.title}"
+        # 持续事件显示时间范围（如 "14:00-17:00 (3h)"）
+        duration_tag = ""
+        if not event.is_all_day and event.end_time and event.end_time != event.start_time:
+            duration_min = event.duration_minutes
+            if duration_min > 0:
+                time_str += f"-{event.end_time.strftime('%H:%M')}"
+                if duration_min >= 60:
+                    h = int(duration_min // 60)
+                    m = int(duration_min % 60)
+                    duration_tag = f" ({h}h{m}min)" if m else f" ({h}h)"
+                else:
+                    duration_tag = f" ({int(duration_min)}min)"
+        title_text = f"{time_str}{duration_tag}  {event.title}"
 
         # 优先级标记
         priority_marker = ""

@@ -144,17 +144,17 @@ class CalendarManager:
     # ================================================================
 
     def get_events_by_date(self, date: datetime) -> List[CalendarEvent]:
-        """查询指定日期的事件
+        """查询指定日期的事件（含循环事件展开）
 
         Args:
             date: 目标日期（只取年月日部分）
 
         Returns:
-            当天的事件列表
+            当天的事件列表（含循环事件的虚拟实例）
         """
         start = date.replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + timedelta(days=1)
-        return self._storage.get_events_by_range(start, end)
+        return self.get_events_by_range(start, end)
 
     def get_events_by_range(self, start: datetime, end: datetime) -> List[CalendarEvent]:
         """查询时间范围内的事件（含循环事件展开）"""

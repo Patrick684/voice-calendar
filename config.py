@@ -45,6 +45,9 @@ class Config:
         "llm_provider": "ollama",  # ollama/openai
         "llm_model": "qwen2.5:7b",
         "llm_base_url": "http://localhost:11434",
+        # LLMParser 设置（新版智能路由核心）
+        "llm_parser_model": "qwen2.5:3b",  # 本地 LLM 模型
+        "llm_parser_timeout": 5.0,  # LLM 超时秒数（兆考首次加载延迟）
         # 意图分类模型设置（可选，替换关键词意图匹配）
         "intent_model_enabled": True,
         "intent_model_path": "models/intent_classifier",

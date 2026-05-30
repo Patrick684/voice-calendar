@@ -29,14 +29,38 @@ class PunctuationProcessor:
         "早上",
         "凌晨",
         "傍晚",
-        # 日历常用词
+        # 时间词扩展（来源：Kaggle 中文时间表达数据集）
+        "清晨",
+        "深夜",
+        "午夜",
+        "黎明",
+        "黄昏",
+        "周末",
+        "月初",
+        "月底",
+        "月末",
+        "年初",
+        "年底",
+        "年末",
+        "礼拜",
+        # 日期词
         "今天",
         "明天",
         "昨天",
         "后天",
+        "前天",
+        "今年",
+        "明年",
+        "去年",
+        "后年",
+        # 循环词
         "每天",
         "每周",
         "每月",
+        "每年",
+        "每逢",
+        "每隔",
+        # 日历常用词
         "起床",
         "吃饭",
         "开会",
@@ -59,13 +83,6 @@ class PunctuationProcessor:
         "答辩",
         "体检",
         # 常见被拆分的双字词
-        "晚上",
-        "早上",
-        "下午",
-        "上午",
-        "每天",
-        "每周",
-        "每月",
         "这个",
         "那个",
         "什么",
@@ -215,7 +232,21 @@ class PunctuationProcessor:
             merged = m.group(1) + m.group(2)
             return merged if merged in self._ASR_MERGE_WORDS else m.group(0)
 
-        return re.sub(r"(.)[\uff0c,\u3001](.)", _try_merge, text)
+        text = re.sub(r"(.)[\uff0c,\u3001](.)", _try_merge, text)
+
+        # 修复时间表达式内的错误逗号：
+        # 1. “点”后不应跟逗号（如 “1点，半” → “1点半”，“十点，” → “十点”）
+        text = re.sub(r"(点)[\uff0c,\u3001]", r"\1", text)
+        # 2. “点”前不应有逗号（如 “十，点” → “十点”）
+        text = re.sub(r"[\uff0c,\u3001](点)", r"\1", text)
+        # 3. 时段词后紧跟“X点”时不应有逗号（如 “下午，两点” → “下午两点”）
+        text = re.sub(
+            r"(上午|下午|中午|晚上|早上|凌晨|傍晚)[\uff0c,\u3001](?=[一二两三四五六七八九十\d]+点)",
+            r"\1",
+            text,
+        )
+
+        return text
 
     def _convert_punctuation(self, text: str) -> str:
         """将中文语境中的英文标点转换为中文标点"""
