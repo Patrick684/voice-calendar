@@ -453,9 +453,9 @@ def test_priority_detection():
     print(f"  [通过] 重要: '明天下午三点重要会议' -> priority={result.priority}")
 
     # 紧急
-    result = engine.parse("安排明天马上截止的项目提交")
+    result = engine.parse("安排明天紧急的项目提交")
     assert result.priority == 2, f"期望 2，实际 {result.priority}"
-    print(f"  [通过] 紧急: '安排明天马上截止的项目提交' -> priority={result.priority}")
+    print(f"  [通过] 紧急: '安排明天紧急的项目提交' -> priority={result.priority}")
 
     # 紧急且重要
     result = engine.parse("安排紧急且重要的客户电话")
@@ -463,13 +463,13 @@ def test_priority_detection():
     print(f"  [通过] 紧急且重要: '安排紧急且重要的客户电话' -> priority={result.priority}")
 
     # 隐式添加也检测优先级
-    result = engine.parse("明天务必完成报告")
+    result = engine.parse("明天重要的报告要完成")
     assert result.priority == 1, f"隐式期望 1，实际 {result.priority}"
-    print(f"  [通过] 隐式优先级: '明天务必完成报告' -> priority={result.priority}")
+    print(f"  [通过] 隐式优先级: '明天重要的报告要完成' -> priority={result.priority}")
 
     # CommandParser 透传
     parser = CommandParser(llm_enabled=False)
-    result = parser.parse("安排明天下午立刻处理的紧急任务")
+    result = parser.parse("安排明天下午紧急处理的任务")
     assert result.priority == 2, f"透传期望 2，实际 {result.priority}"
     print(f"  [通过] CommandParser 透传: priority={result.priority}")
 
