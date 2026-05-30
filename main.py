@@ -599,6 +599,145 @@ class VoiceCalendarApp:
 
         return default
 
+    def _execute_update_event(self, command):
+        """执行修改事件
+
+        解析层提供:
+        - command.title: 事件名称（用于搜索）
+        - command.time: 目标时间（绝对调整）或 None（相对偏移）
+        - command.end_time: 源时间（用于定位事件所在日期）
+        - command.original_text: 原始文本（用于提取偏移量）
+        """
+        from datetime import timedelta
+
+        title = command.title
+        target_time = command.time  # 目标时间（绝对）
+        source_time = command.end_time  # 源时间（用于定位事件）
+
+        if not title and not target_time and not source_time:
+            self._result_queue.put(("voice_state", VoiceState.ERROR, "无法识别要修改的事件"))
+            return
+
+        # 搜索匹配事件: title 精确匹配 → 源时间日期匹配 → 目标时间日期匹配
+        candidates = []
+        if title:
+            candidates = self._calendar.search_events(title)
+            # 如果有源时间，用它缩小范围
+            if candidates and source_time:
+                date_filtered = [e for e in candidates if e.start_time.date() == source_time.date()]
+                if date_filtered:
+                    candidates = date_filtered
+
+        if not candidates and source_time:
+            candidates = self._calendar.get_events_by_date(source_time)
+            # 如果有标题，进一步筛选
+            if candidates and title:
+                title_filtered = [e for e in candidates if title in e.title]
+                if title_filtered:
+                    candidates = title_filtered
+
+        if not candidates and target_time:
+            candidates = self._calendar.get_events_by_date(target_time)
+
+        if not candidates:
+            self._result_queue.put(
+                ("voice_state", VoiceState.ERROR, f"未找到匹配的事件: {title or command.original_text}")
+            )
+            return
+
+        # 多个候选时选时间最近的（未来优先）
+        from datetime import datetime as dt
+
+        now = dt.now()
+        candidates.sort(key=lambda e: (0 if e.start_time >= now else 1, abs((e.start_time - now).total_seconds())))
+        target_event = candidates[0]
+
+        # 确定更新内容
+        update_kwargs = {}
+        original_text = command.original_text
+
+        # 判断相对/绝对模式
+        is_relative = any(
+            kw in original_text for kw in ["推迟", "延后", "往后推", "向后推", "提前", "向前推", "往前推"]
+        )
+
+        if is_relative:
+            # 相对偏移：从原文提取偏移量
+            offset_minutes = self._parse_relative_offset(original_text, default=60)
+            if any(kw in original_text for kw in ["提前", "向前推", "往前推"]):
+                offset_minutes = -offset_minutes
+            new_start = target_event.start_time + timedelta(minutes=offset_minutes)
+            update_kwargs["start_time"] = new_start
+            if target_event.end_time and target_event.end_time != target_event.start_time:
+                update_kwargs["end_time"] = target_event.end_time + timedelta(minutes=offset_minutes)
+        elif target_time:
+            # 绝对时间更新
+            if target_time.hour == 0 and target_time.minute == 0:
+                # 目标时间只有日期，保留原事件时分
+                new_start = target_time.replace(
+                    hour=target_event.start_time.hour, minute=target_event.start_time.minute
+                )
+            else:
+                new_start = target_time
+            update_kwargs["start_time"] = new_start
+            if target_event.end_time and target_event.end_time != target_event.start_time:
+                duration = target_event.end_time - target_event.start_time
+                update_kwargs["end_time"] = new_start + duration
+        else:
+            self._result_queue.put(("voice_state", VoiceState.ERROR, "无法确定修改内容"))
+            return
+
+        # 执行更新
+        updated = self._calendar.update_event(target_event.id, **update_kwargs)
+        if updated:
+            new_time_str = update_kwargs["start_time"].strftime("%m月%d日 %H:%M")
+            msg = f"已修改: {target_event.title} → {new_time_str}"
+            logger.info(msg)
+            self._result_queue.put(("command_executed", msg, "update"))
+        else:
+            self._result_queue.put(("voice_state", VoiceState.ERROR, "修改失败"))
+
+    @staticmethod
+    def _parse_relative_offset(text: str, default: int = 60) -> int:
+        """从文本中提取相对偏移量（分钟）
+
+        支持: "N个小时", "N小时", "N分钟", "半小时"
+        默认返回 default 分钟
+        """
+        import re
+
+        # 半小时
+        if "半小时" in text or "半天" in text:
+            if "半天" in text:
+                return 720
+            return 30
+
+        # N个小时 / N小时
+        m = re.search(r"(\d+)\s*个?小时", text)
+        if m:
+            return int(m.group(1)) * 60
+
+        # N分钟
+        m = re.search(r"(\d+)\s*分钟?", text)
+        if m:
+            return int(m.group(1))
+
+        # 中文数字
+        cn_nums = {"一": 1, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+        m = re.search(r"([一两三四五六七八九十]+)\s*个?小时", text)
+        if m:
+            cn = m.group(1)
+            num = cn_nums.get(cn, 1)
+            return num * 60
+
+        m = re.search(r"([一两三四五六七八九十]+)\s*分钟?", text)
+        if m:
+            cn = m.group(1)
+            num = cn_nums.get(cn, default)
+            return num
+
+        return default
+
     # ================================================================
     # UI 回调与更新
     # ================================================================
