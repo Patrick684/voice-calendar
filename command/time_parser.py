@@ -217,7 +217,7 @@ class TimeParser:
         return None, text
 
     def _parse_next_weekday(self, text: str, now: datetime) -> Tuple[Optional[datetime], str]:
-        """解析 下周X / 上周X / 周X"""
+        """解析 下下周X / 下周X / 上周X / 周X"""
         # 上周X / 上星期X（过去）
         match = re.search(r"上(周|星期)([一二三四五六日天])", text)
         if match:
@@ -227,6 +227,18 @@ class TimeParser:
             if days_back == 0:
                 days_back = 7
             result = now.replace(hour=9, minute=0, second=0, microsecond=0) - timedelta(days=days_back)
+            remaining = text[: match.start()] + text[match.end() :]
+            return result, remaining
+
+        # 下下周X / 下下星期X（两周后）
+        match = re.search(r"下下(周|星期)([一二三四五六日天])", text)
+        if match:
+            target_weekday = self.WEEKDAY_MAP[match.group(2)]
+            current_weekday = now.weekday()
+            days_ahead = (target_weekday - current_weekday) % 7
+            if days_ahead == 0:
+                days_ahead = 7
+            result = now.replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=days_ahead + 7)
             remaining = text[: match.start()] + text[match.end() :]
             return result, remaining
 
@@ -314,13 +326,17 @@ class TimeParser:
                 remaining = text[: match.start()] + text[match.end() :]
                 return (hour, minute), remaining
 
-        # 数字时间: HH点/MM:00
-        match = re.search(r"(\d{1,2})\s*点", text)
+        # 数字时间: HH点半/HH点
+        match = re.search(r"(\d{1,2})\s*点\s*(半|十五|三十|四十五)?", text)
         if match:
             hour = int(match.group(1))
             if 0 <= hour <= 23:
+                minute = 0
+                if match.group(2):
+                    minute_map = {"半": 30, "十五": 15, "三十": 30, "四十五": 45}
+                    minute = minute_map.get(match.group(2), 0)
                 remaining = text[: match.start()] + text[match.end() :]
-                return (hour, 0), remaining
+                return (hour, minute), remaining
 
         # 中文时间: 三点/三点半/三点十五
         match = re.search(r"([一二两三四五六七八九十]+)\s*点\s*(半|十五|三十|四十五)?", text)

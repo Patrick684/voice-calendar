@@ -18,6 +18,69 @@ from typing import Optional
 class PunctuationProcessor:
     """中文标点修正处理器"""
 
+    # ASR 逗号误插入合并词表（Whisper 常在双字词中间插入逗号）
+    # 包含时间词、日历常用词、常见双字词
+    _ASR_MERGE_WORDS = {
+        # 时间词
+        "上午",
+        "下午",
+        "中午",
+        "晚上",
+        "早上",
+        "凌晨",
+        "傍晚",
+        # 日历常用词
+        "今天",
+        "明天",
+        "昨天",
+        "后天",
+        "每天",
+        "每周",
+        "每月",
+        "起床",
+        "吃饭",
+        "开会",
+        "面试",
+        "健身",
+        "学习",
+        "打卡",
+        "提醒",
+        "取消",
+        "删除",
+        "修改",
+        "推迟",
+        "提前",
+        "安排",
+        "报告",
+        "会议",
+        "聚餐",
+        "培训",
+        "考试",
+        "答辩",
+        "体检",
+        # 常见被拆分的双字词
+        "晚上",
+        "早上",
+        "下午",
+        "上午",
+        "每天",
+        "每周",
+        "每月",
+        "这个",
+        "那个",
+        "什么",
+        "怎么",
+        "因为",
+        "所以",
+        "如果",
+        "然后",
+        "但是",
+        "已经",
+        "可以",
+        "应该",
+        "需要",
+    }
+
     # 英文标点到中文标点的映射
     EN_TO_ZH_PUNCT = {
         ".": "。",
@@ -120,6 +183,9 @@ class PunctuationProcessor:
 
     def _process_chinese(self, text: str) -> str:
         """处理中文标点（CT-Transformer 输出的后处理）"""
+        # 0. 修复 ASR 在双字词中间插入的错误逗号
+        text = self._fix_asr_comma_splits(text)
+
         # 1. 英文标点转中文标点
         text = self._convert_punctuation(text)
 
@@ -137,6 +203,19 @@ class PunctuationProcessor:
             text = self._auto_paragraph(text)
 
         return text
+
+    def _fix_asr_comma_splits(self, text: str) -> str:
+        """修复 ASR 在双字词中间插入的错误逗号
+
+        Whisper 常在双字词中间插入逗号（如 '晚，上' → '晚上'），
+        当两个字符合已知词表时合并。
+        """
+
+        def _try_merge(m):
+            merged = m.group(1) + m.group(2)
+            return merged if merged in self._ASR_MERGE_WORDS else m.group(0)
+
+        return re.sub(r"(.)[\uff0c,\u3001](.)", _try_merge, text)
 
     def _convert_punctuation(self, text: str) -> str:
         """将中文语境中的英文标点转换为中文标点"""
