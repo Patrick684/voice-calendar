@@ -1235,6 +1235,28 @@ def test_interaction_log_regressions():
     print()
 
 
+def _test_time_parser_fuzzy_correct():
+    """TimeParser 时间词纠错测试（依赖 pypinyin）"""
+    try:
+        import pypinyin  # noqa: F401
+    except ImportError:
+        print("  [跳过] pypinyin 未安装，TimeParser 模糊纠错测试跳过")
+        return
+
+    from command.time_parser import TimeParser
+
+    tp_cases = [
+        ("帮晚六点吃饭", "傍晚", "TimeParser: 帮晚→傍晚"),
+        ("零晨三点开会", "凌晨", "TimeParser: 零晨→凌晨"),
+    ]
+    for input_text, expected_keyword, desc in tp_cases:
+        corrected = TimeParser._fuzzy_correct_time_keywords(input_text)
+        assert expected_keyword in corrected, (
+            f"{desc} 失败: '{input_text}' → '{corrected}', 期望包含 '{expected_keyword}'"
+        )
+        print(f"  [通过] {desc}")
+
+
 def test_asr_text_correction():
     """测试 ASR 后处理纠错链路"""
     print("=" * 50)
@@ -1244,6 +1266,12 @@ def test_asr_text_correction():
     from engine.text_corrector import TextCorrector
 
     corrector = TextCorrector(enabled=True)
+
+    if not corrector._pypinyin_available:
+        print("  [跳过] pypinyin 未安装，TextCorrector/PostProcessor 同音纠错测试跳过")
+        _test_time_parser_fuzzy_correct()
+        print()
+        return
 
     # 日历场景同音纠错
     test_cases = [
@@ -1256,8 +1284,6 @@ def test_asr_text_correction():
 
     for input_text, expected_contains, desc in test_cases:
         result = corrector.correct(input_text)
-        # 检查关键部分是否被纠正
-        # 注: 的/地/得规则可能会添加“的”，所以用 in 检查
         assert expected_contains in result or result == expected_contains, (
             f"{desc} 失败: '{input_text}' → '{result}', 期望包含 '{expected_contains}'"
         )
@@ -1281,21 +1307,7 @@ def test_asr_text_correction():
         print(f"  [通过] {desc}")
 
     # TimeParser 时间词纠错测试
-    tp_cases = [
-        ("帮晚六点吃饭", "傍晚", "TimeParser: 帮晚→傍晚"),
-        ("零晨三点开会", "凌晨", "TimeParser: 零晨→凌晨"),
-    ]
-
-    from command.time_parser import TimeParser
-
-    tp = TimeParser()
-    for input_text, expected_keyword, desc in tp_cases:
-        # _fuzzy_correct 是 classmethod，直接调用
-        corrected = TimeParser._fuzzy_correct_time_keywords(input_text)
-        assert expected_keyword in corrected, (
-            f"{desc} 失败: '{input_text}' → '{corrected}', 期望包含 '{expected_keyword}'"
-        )
-        print(f"  [通过] {desc}")
+    _test_time_parser_fuzzy_correct()
 
     print()
 
