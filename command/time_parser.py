@@ -21,6 +21,20 @@ logger = logging.getLogger(__name__)
 class TimeParser:
     """中文时间表达式解析器"""
 
+    # 常见 ASR 误识别静态映射（不依赖 pypinyin 的兑底纠错）
+    # 仅包含时间关键词的高频误识别，避免过度纠正
+    _ASR_TIME_CORRECTIONS = {
+        "后间": "后天",
+        "明先": "明天",
+        "今添": "今天",
+        "做天": "昨天",
+        "上无": "上午",
+        "下无": "下午",
+        "万上": "晚上",
+        "早桑": "早上",
+        "令成": "凌晨",
+    }
+
     # 时间关键词及其拼音基准（用于近音纠错）
     TIME_KEYWORD_PINYIN = {
         # 日期词
@@ -43,14 +57,31 @@ class TimeParser:
         "中午": ["zhong", "wu"],
         "傍晚": ["bang", "wan"],
         "凌晨": ["ling", "chen"],
+        # 时段词扩展（来源：Kaggle 中文时间表达数据集）
+        "清晨": ["qing", "chen"],
+        "深夜": ["shen", "ye"],
+        "午夜": ["wu", "ye"],
+        "黎明": ["li", "ming"],
         # 周相关
         "下周": ["xia", "zhou"],
         "这周": ["zhe", "zhou"],
+        "上周": ["shang", "zhou"],
+        "本周": ["ben", "zhou"],
+        "周末": ["zhou", "mo"],
+        # 周别名（口语高频）
+        "礼拜": ["li", "bai"],
+        # 月相关
+        "月初": ["yue", "chu"],
+        "月底": ["yue", "di"],
+        "月末": ["yue", "mo"],
+        "年初": ["nian", "chu"],
+        "年底": ["nian", "di"],
     }
 
     # 中文数字到阿拉伯数字映射
     CN_NUM = {
         "零": 0,
+        "〇": 0,
         "一": 1,
         "二": 2,
         "两": 2,
@@ -89,10 +120,15 @@ class TimeParser:
         "晚上": 19,
         "晚间": 20,
         "凌晨": 2,
+        # 扩展时段（来源：Kaggle 数据集高频词）
+        "清晨": 6,
+        "黎明": 5,
+        "午夜": 0,
+        "深夜": 23,
     }
 
     # 时段对 12 小时制的影响
-    PERIOD_PM_OFFSET = {"下午", "晚上", "晚间", "傍晚"}
+    PERIOD_PM_OFFSET = {"下午", "晚上", "晚间", "傍晚", "深夜"}
 
     def parse(self, text: str, base_date: Optional[datetime] = None) -> Tuple[Optional[datetime], str]:
         """解析文本中的时间表达式
@@ -124,6 +160,12 @@ class TimeParser:
             weekday_result, remaining = self._parse_next_weekday(remaining, ref)
             if weekday_result is not None:
                 result_time = weekday_result
+
+        # 2b. 解析模糊日期（月底/月初/年底/年初/周末）
+        if result_time is None:
+            fuzzy_result, remaining = self._parse_fuzzy_date(remaining, ref)
+            if fuzzy_result is not None:
+                result_time = fuzzy_result
 
         # 3. 解析 "X月X号" / "X号"
         if result_time is None:
@@ -266,8 +308,113 @@ class TimeParser:
 
         return None, text
 
+    def _parse_fuzzy_date(self, text: str, now: datetime) -> Tuple[Optional[datetime], str]:
+        """解析模糊日期词：月底/月初/月末/年初/年底/周末
+
+        这些词没有精确日期，但在日历场景中有明确语义：
+        - 月初 → 当月1号（已过则下月1号）
+        - 月底/月末 → 当月最后一天（已过则下月最后一天）
+        - 年初 → 当年1月1日（已过则明年）
+        - 年底 → 当年12月31日（已过则明年）
+        - 周末 → 最近的周六
+        """
+        import calendar as cal
+
+        # 月底/月末（长词优先）
+        match = re.search(r"月底|月末", text)
+        if match:
+            # 当月最后一天
+            last_day = cal.monthrange(now.year, now.month)[1]
+            result = now.replace(day=last_day, hour=9, minute=0, second=0, microsecond=0)
+            # 如果已过，推到下个月最后一天
+            if result.date() < now.date():
+                next_month = now.month + 1
+                next_year = now.year
+                if next_month > 12:
+                    next_month = 1
+                    next_year += 1
+                last_day = cal.monthrange(next_year, next_month)[1]
+                result = datetime(next_year, next_month, last_day, 9, 0, 0)
+            remaining = text[: match.start()] + text[match.end() :]
+            return result, remaining
+
+        # 月初
+        match = re.search(r"月初", text)
+        if match:
+            result = now.replace(day=1, hour=9, minute=0, second=0, microsecond=0)
+            # 如果已过当月初（过了5号就认为月初已过）
+            if now.day > 5:
+                next_month = now.month + 1
+                next_year = now.year
+                if next_month > 12:
+                    next_month = 1
+                    next_year += 1
+                result = datetime(next_year, next_month, 1, 9, 0, 0)
+            remaining = text[: match.start()] + text[match.end() :]
+            return result, remaining
+
+        # 年底
+        match = re.search(r"年底", text)
+        if match:
+            result = datetime(now.year, 12, 31, 9, 0, 0)
+            # 如果已过（12月31日之后），推到明年
+            if result.date() < now.date():
+                result = datetime(now.year + 1, 12, 31, 9, 0, 0)
+            remaining = text[: match.start()] + text[match.end() :]
+            return result, remaining
+
+        # 年初
+        match = re.search(r"年初", text)
+        if match:
+            result = datetime(now.year, 1, 1, 9, 0, 0)
+            # 如果已过1月（过了1月就认为年初已过）
+            if now.month > 1:
+                result = datetime(now.year + 1, 1, 1, 9, 0, 0)
+            remaining = text[: match.start()] + text[match.end() :]
+            return result, remaining
+
+        # 周末（映射到最近的周六）
+        match = re.search(r"周末", text)
+        if match:
+            current_weekday = now.weekday()  # 0=Mon, 5=Sat, 6=Sun
+            days_ahead = (5 - current_weekday) % 7
+            if days_ahead == 0 and now.hour >= 18:
+                days_ahead = 7  # 周六傍晚后指下个周末
+            result = now.replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(days=days_ahead)
+            remaining = text[: match.start()] + text[match.end() :]
+            return result, remaining
+
+        return None, text
+
     def _parse_month_day(self, text: str, now: datetime) -> Tuple[Optional[datetime], str]:
-        """解析 X月X号 / X月X日 / X号"""
+        """解析 X月X号 / X月X日 / 下个月X号 / 上个月X号 / X号"""
+        # 下个月/上个月 + X号/日
+        match = re.search(
+            r"(下|上)(?:个)?月\s*(\d{1,2}|[一二三四五六七八九十]+)\s*[号日]",
+            text,
+        )
+        if match:
+            direction = 1 if match.group(1) == "下" else -1
+            day = self._cn_to_int(match.group(2))
+            target_month = now.month + direction
+            target_year = now.year
+            if target_month > 12:
+                target_month = 1
+                target_year += 1
+            elif target_month < 1:
+                target_month = 12
+                target_year -= 1
+            try:
+                import calendar as cal
+
+                max_day = cal.monthrange(target_year, target_month)[1]
+                day = min(day, max_day)
+                result = datetime(target_year, target_month, day, 9, 0, 0)
+                remaining = text[: match.start()] + text[match.end() :]
+                return result, remaining
+            except ValueError:
+                pass
+
         # X月X号/日
         match = re.search(
             r"(\d{1,2}|[一二三四五六七八九十]+)\s*月\s*(\d{1,2}|[一二三四五六七八九十]+)\s*[号日]",
@@ -338,15 +485,15 @@ class TimeParser:
                 remaining = text[: match.start()] + text[match.end() :]
                 return (hour, minute), remaining
 
-        # 中文时间: 三点/三点半/三点十五
-        match = re.search(r"([一二两三四五六七八九十]+)\s*点\s*(半|十五|三十|四十五)?", text)
+        # 中文时间: 三点/三点半/三点十五/零点
+        match = re.search(r"([零〇一二两三四五六七八九十]+)\s*点\s*(半|十五|三十|四十五)?", text)
         if match:
             hour = self._cn_to_int(match.group(1))
             minute = 0
             if match.group(2):
                 minute_map = {"半": 30, "十五": 15, "三十": 30, "四十五": 45}
                 minute = minute_map.get(match.group(2), 0)
-            if 1 <= hour <= 12:
+            if 0 <= hour <= 12:
                 remaining = text[: match.start()] + text[match.end() :]
                 return (hour, minute), remaining
 
@@ -365,22 +512,23 @@ class TimeParser:
     def _fuzzy_correct_time_keywords(cls, text: str) -> str:
         """对文本中的时间关键词进行近音纠错
 
-        使用拼音归一化 + 精确匹配策略，将 Whisper 可能误识别的近音词
-        纠正为正确的时间关键词。
-
-        归一化规则（处理常见中文发音混淆）：
-        - n/l 不分（南方口音）：nan -> lan
-        - 前鼻音/后鼻音不分：in -> ing
-        - 翘舌/平舌不分：sh -> s
-
-        例如：“明先” → “明天”，“后添” → “后天”
+        分两层：
+        1. 静态字典纠错（不依赖 pypinyin，覆盖高频 ASR 误识别）
+        2. pypinyin 拼音归一化纠错（如已安装）
 
         Args:
             text: 待纠错的文本
 
         Returns:
-            纠正后的文本
+            纠错后的文本
         """
+        # 第1层：静态字典纠错（高频 ASR 误识别）
+        for wrong, correct in cls._ASR_TIME_CORRECTIONS.items():
+            if wrong in text:
+                logger.info(f"静态纠错: '{wrong}' -> '{correct}'")
+                text = text.replace(wrong, correct)
+
+        # 第2层：pypinyin 拼音归一化纠错
         try:
             from pypinyin import lazy_pinyin
         except ImportError:

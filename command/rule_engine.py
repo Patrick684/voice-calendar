@@ -109,7 +109,6 @@ class RuleEngine:
         "有哪些",
         "日程",
         "行程",
-        "计划",
         "待办",
         "待办事项",
         "事项",
@@ -128,6 +127,13 @@ class RuleEngine:
         "改为",
         "向前推",
         "往后推",
+        "往前推",
+        "向后推",
+        "往后延",
+        "向后延",
+        "后延",
+        "延后",
+        "挂到",
         "挪到",
         "移到",
     ]
@@ -147,11 +153,29 @@ class RuleEngine:
         "这个",
         "有个",
         "左右",
+        "大约是",  # "大约是"优先于"大约"，避免残留"是"
+        "差不多是",
+        "大概是",
         "大约",
         "大概",
         "差不多",
-        "都",  # 循环句式中的"都"不是标题部分（如"每天都要午睡"）
+        "都",  # 循环句式中的“都”不是标题部分（如“每天都要午睡”）
+        # 通用量词/修饰词（如“删除今天的所有事件”中的“所有”）
+        "所有",
+        "全部",
+        "一切",
+        "整个",
+        "事件",
+        "安排",
+        "日程",
+        "事项",
     ]
+
+    # 口语填充词（动词间的量词/助词，时间已剥离后可安全删除）
+    TITLE_ORAL_FILLERS = ["个", "了", "啊", "吧", "呢"]
+
+    # 口语前缀（导向动词，标题中不需要）
+    TITLE_ORAL_PREFIXES = ["去", "来", "得"]
 
     # 标题首部噪音词（包含助词）
     TITLE_LEAD_NOISE = ["的", "了", "吧", "呢", "啊", "一个", "一条", "我"]
@@ -225,8 +249,8 @@ class RuleEngine:
             (CommandType.DELETE_EVENT, self._delete_pattern),
             (CommandType.UPDATE_EVENT, self._update_pattern),
             (CommandType.QUERY_EVENT, self._query_phrase_pattern),  # 查询短语优先
+            (CommandType.QUERY_EVENT, self._query_pattern),  # 查询关键词先于添加（避免“安排”匹配“查看...安排”）
             (CommandType.ADD_EVENT, self._add_pattern),
-            (CommandType.QUERY_EVENT, self._query_pattern),  # 查询关键词后置
         ]:
             match = pattern.search(text)
             if match:
@@ -273,6 +297,10 @@ class RuleEngine:
         """
         # 移除关键词，剩余部分用于提取时间和标题
         text_without_keyword = (text[: keyword_match.start()] + text[keyword_match.end() :]).strip()
+
+        # UPDATE 专用路径：双时间解析
+        if cmd_type == CommandType.UPDATE_EVENT:
+            return self._extract_update_details(text, keyword_match, base_date)
 
         # 检测优先级
         priority = self._detect_priority(text)
@@ -328,6 +356,37 @@ class RuleEngine:
             confidence=0.8,
         )
 
+    @staticmethod
+    def _auto_advance_past_time(parsed_time: Optional[datetime], text: str) -> Optional[datetime]:
+        """对 ADD_EVENT 的过去时间自动前推到明天
+
+        规则：如果解析出的时间已过去（今天内），且原文中无明确过去日期标记（昨天/前天/上周），
+        则自动推迟到明天同一时间。
+
+        例：用户在下午说"午夜零点跨年倒计时" → 今天 0:00 已过 → 推到明天 0:00
+        """
+        if parsed_time is None:
+            return None
+
+        from datetime import timedelta
+
+        now = datetime.now()
+
+        # 只对“今天内的过去时间”生效
+        if parsed_time.date() != now.date():
+            return parsed_time
+        if parsed_time >= now:
+            return parsed_time
+
+        # 检查是否有明确的过去日期标记
+        past_markers = ["昨天", "昨日", "前天", "大前天", "上周", "上星期"]
+        for marker in past_markers:
+            if marker in text:
+                return parsed_time  # 用户明确指定过去，不前推
+
+        # 自动前推到明天
+        return parsed_time + timedelta(days=1)
+
     def _try_implicit_add(self, text: str, base_date: Optional[datetime] = None) -> Optional[ParsedCommand]:
         """尝试隐式添加指令（无明确关键词，但有时间+标题）
 
@@ -357,6 +416,13 @@ class RuleEngine:
         if parsed_time is not None:
             title = self._clean_title(remaining)
             if title:
+                # 过去时间自动前推（ADD_EVENT 专用）
+                original_time = parsed_time
+                parsed_time = self._auto_advance_past_time(parsed_time, text)
+                # 如果时间被前推了，end_time 也同步前推
+                if end_time and parsed_time != original_time:
+                    offset = parsed_time - original_time
+                    end_time = end_time + offset
                 return ParsedCommand(
                     command_type=CommandType.ADD_EVENT,
                     title=title,
@@ -366,7 +432,7 @@ class RuleEngine:
                     recurrence_rule=recurrence_rule,
                     recurrence_end=rec_end,
                     original_text=text,
-                    confidence=0.75,  # 时间解析成功是强信号，隐式指令置信度可提高
+                    confidence=0.75,
                 )
         return None
 
@@ -420,6 +486,139 @@ class RuleEngine:
 
         result = self._recurrence_resolver.resolve(text, base_date=base_date)
         return result.rule, result.cleaned_text, result.start_time, result.end_time
+
+    # UPDATE 专用偏移量解析模式
+    _UPDATE_OFFSET_PATTERNS = [
+        (
+            re.compile(
+                r"([\u4e00\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\d]+)\s*\u4e2a?\u534a\u5c0f\u65f6"
+            ),
+            0.5,
+            "hour",
+        ),
+        (
+            re.compile(r"([\u4e00\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\d]+)\s*\u4e2a?\u5c0f\u65f6"),
+            1.0,
+            "hour",
+        ),
+        (re.compile(r"\u534a\u5c0f\u65f6"), 0.5, "hour"),
+        (re.compile(r"\u534a\u5929"), 12.0, "hour"),
+        (
+            re.compile(r"([\u4e00\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\d]+)\s*\u5206\u949f?"),
+            1.0,
+            "minute",
+        ),
+    ]
+
+    # UPDATE 指令偏移类关键词
+    _UPDATE_DELAY_KEYWORDS = ["推迟", "延后", "往后推", "向后推", "后延"]
+    _UPDATE_ADVANCE_KEYWORDS = ["提前", "向前推", "往前推", "前移"]
+
+    def _extract_update_details(
+        self,
+        text: str,
+        keyword_match: re.Match,
+        base_date: Optional[datetime] = None,
+    ) -> ParsedCommand:
+        """UPDATE 专用解析：以 keyword 为分界点，左侧提取源时间+标题，右侧提取目标时间/偏移量
+
+        模式:
+        - "把[后天的][会议]改到[下周三]" → left="把后天的会议", right="下周三"
+        - "推迟[明天的][面试]" → left="", right="明天的面试"
+        - "[看牙]推迟[一个小时]" → left="看牙", right="一个小时"
+        - "[六月一号的面试]向前推[一个小时]" → left="六月一号的面试", right="一个小时"
+
+        返回:
+            ParsedCommand, 其中:
+            - title: 事件名称（用于搜索）
+            - time: 目标时间（绝对调整时）或 None（相对偏移时）
+            - end_time: 源时间（用于定位事件，复用字段）
+            - original_text: 原始文本（供执行层提取偏移信息）
+        """
+        keyword = keyword_match.group(0)
+        left_part = text[: keyword_match.start()].strip()
+        right_part = text[keyword_match.end() :].strip()
+
+        # 清理常见前缀: "把"/"将"
+        for prefix in ["把", "将"]:
+            if left_part.startswith(prefix):
+                left_part = left_part[len(prefix) :].strip()
+
+        # Step 1: 判断是相对偏移还是绝对时间
+        is_delay = any(kw == keyword or kw in text for kw in self._UPDATE_DELAY_KEYWORDS)
+        is_advance = any(kw == keyword or kw in text for kw in self._UPDATE_ADVANCE_KEYWORDS)
+        is_relative = is_delay or is_advance
+
+        # Step 2: 提取偏移量（如果是相对偏移）
+        offset_minutes = 0
+        if is_relative:
+            # 从 right_part 和 left_part 中查找偏移量
+            search_text = right_part or left_part
+            for pattern, multiplier, unit in self._UPDATE_OFFSET_PATTERNS:
+                m = pattern.search(search_text)
+                if m:
+                    if m.lastindex and m.lastindex >= 1:
+                        num_str = m.group(1)
+                        try:
+                            num = int(num_str)
+                        except ValueError:
+                            num = self._CN_NUM_MAP.get(num_str, 1)
+                    else:
+                        num = 1
+                    if unit == "hour":
+                        offset_minutes = int(num * multiplier * 60)
+                    else:
+                        offset_minutes = int(num * multiplier)
+                    # 从搜索文本中移除偏移表达
+                    if search_text == right_part:
+                        right_part = (right_part[: m.start()] + right_part[m.end() :]).strip()
+                    else:
+                        left_part = (left_part[: m.start()] + left_part[m.end() :]).strip()
+                    break
+
+            if offset_minutes == 0:
+                offset_minutes = 60  # 默认 1 小时
+            if is_advance:
+                offset_minutes = -offset_minutes
+
+        # Step 3: 从左侧提取源时间 + 标题
+        source_time = None
+        title = ""
+
+        # 左侧可能是 "后天的会议" / "明天的面试" / "看牙" / "六月一号的面试"
+        if left_part:
+            source_time, left_remaining = self._time_parser.parse(left_part, base_date=base_date)
+            title = self._clean_title(left_remaining)
+
+        # 如果左侧没有标题，从右侧找（如 "推迟明天的面试"）
+        if not title and right_part:
+            rt, right_remaining = self._time_parser.parse(right_part, base_date=base_date)
+            if rt:
+                if source_time is None:
+                    source_time = rt
+                title = self._clean_title(right_remaining)
+            else:
+                title = self._clean_title(right_part)
+
+        # Step 4: 从右侧提取目标时间（绝对调整时）
+        target_time = None
+        if not is_relative and right_part:
+            target_time, _ = self._time_parser.parse(right_part, base_date=base_date)
+
+        # 如果时间解析失败且非相对模式，尝试从全文解析
+        if target_time is None and not is_relative:
+            # 尝试从全文解析（去掉keyword后）
+            full_text = (left_part + " " + right_part).strip()
+            target_time, _ = self._time_parser.parse(full_text, base_date=base_date)
+
+        return ParsedCommand(
+            command_type=CommandType.UPDATE_EVENT,
+            title=title,
+            time=target_time,  # 目标时间（绝对调整）或 None（相对偏移）
+            end_time=source_time,  # 复用: 源时间（用于定位事件）
+            original_text=text,
+            confidence=0.8,
+        )
 
     # 持续时长检测模式
     _DURATION_PATTERNS = [
@@ -488,8 +687,11 @@ class RuleEngine:
 
         return None, text
 
+    # "一个"后面跟这些词时不应被删除（时间/量词短语保护）
+    _NOISE_PROTECT_SUFFIXES = ["小时", "半小时", "钟头", "分钟", "月", "星期", "礼拜"]
+
     def _clean_title(self, text: str) -> str:
-        """清理事件标题，去除噪音词和多余空白
+        """清理事件标题，去除噪音词、口语填充词和多余空白
 
         Args:
             text: 待清理文本
@@ -500,13 +702,32 @@ class RuleEngine:
         if not text:
             return ""
 
-        # 去除噪音词
+        # 去除噪音词（带保护逻辑）
         for word in self.TITLE_NOISE_WORDS:
+            if word == "一个":
+                # 保护 "一个小时"、"一个半小时"、"一个月" 等
+                protected = False
+                for suffix in self._NOISE_PROTECT_SUFFIXES:
+                    if f"一个{suffix}" in text or f"一个半{suffix}" in text:
+                        protected = True
+                        break
+                if protected:
+                    continue
             text = text.replace(word, "")
 
+        # 去除口语填充词（如 "开个会" → "开会"，"跑个步" → "跑步"）
+        for filler in self.TITLE_ORAL_FILLERS:
+            text = text.replace(filler, "")
+
+        # 去除口语前缀（仅当前缀后还有内容时）
+        for prefix in self.TITLE_ORAL_PREFIXES:
+            if text.startswith(prefix) and len(text) > len(prefix):
+                text = text[len(prefix) :]
+
         # 去除优先级关键词（避免“必须完成报告”这类标题）
-        for word in self.PRIORITY_URGENT_WORDS + self.PRIORITY_IMPORTANT_WORDS + self.PRIORITY_CRITICAL_WORDS:
-            text = text.replace(word, "")
+        all_priority_words = self.PRIORITY_URGENT_WORDS + self.PRIORITY_IMPORTANT_WORDS + self.PRIORITY_CRITICAL_WORDS
+        for word in all_priority_words:
+            text = re.sub(re.escape(word) + r"的?", "", text)
 
         # 去除首尾的连词、助词和标点
         text = re.sub(r"^[\uff0c,\u3001\s]+|[\uff0c,\u3002.!\uff01?\uff1f\s]+$", "", text)
@@ -514,6 +735,8 @@ class RuleEngine:
         for lead_word in self.TITLE_LEAD_NOISE:
             while text.startswith(lead_word):
                 text = text[len(lead_word) :].strip()
+        # 去除尾部孤立助词/填充词（如 "开会 是" → "开会"）
+        text = re.sub(r"\s+[是的了吧呢啊呀]$", "", text)
 
         # 合并多余空白
         text = re.sub(r"\s+", " ", text).strip()

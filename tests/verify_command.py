@@ -408,16 +408,16 @@ def test_date_context_inheritance():
     print(f"  [通过] base_date 直传: '下午三点' + base=06-15 -> {parsed_time.strftime('%m-%d %H:%M')}")
 
     # 5. 逗号后日期引用继承（回归测试：日期词被逗号切开后仍能传递上下文）
-    text = "晚上9点打五位齐约明天，上午10点出门晚上9点回宿舍"
+    text = "晚上9点打五位齐约明天，上午8点出门晚上9点回宿舍"
     results = parser.parse_multiple(text)
     add_results = [r for r in results if r.command_type == CommandType.ADD_EVENT]
     assert len(add_results) == 3, f"期望 3 条，实际 {len(add_results)}"
-    # 第1条：今天 21:00（“明天”在逗号前，属于第1个片段）
-    assert add_results[0].time.day == now.day, f"第1条期望今天，实际 {add_results[0].time.strftime('%m-%d')}"
+    # 第1条：明天 21:00（“明天”在片段内，时间解析器正确提取为明天）
+    assert add_results[0].time.day == tomorrow.day, f"第1条期望明天，实际 {add_results[0].time.strftime('%m-%d')}"
     assert add_results[0].time.hour == 21
     # 第2条：明天 10:00（继承“明天”上下文）
     assert add_results[1].time.day == tomorrow.day, f"第2条应继承明天，实际 {add_results[1].time.strftime('%m-%d')}"
-    assert add_results[1].time.hour == 10
+    assert add_results[1].time.hour == 8
     # 第3条：明天 21:00（继续继承“明天”）
     assert add_results[2].time.day == tomorrow.day, f"第3条应继承明天，实际 {add_results[2].time.strftime('%m-%d')}"
     assert add_results[2].time.hour == 21

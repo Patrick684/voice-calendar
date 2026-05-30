@@ -126,8 +126,8 @@ class RecurrenceResolver:
     # 每月X号模式
     _MONTHLY_DAY_PATTERN = re.compile(r"(?:每个月|每月)\s*(\d{1,2}|[一二三四五六七八九十百]+)\s*[号日]")
 
-    # 每周X模式（带星期后缀）
-    _WEEKDAY_PATTERN = re.compile(r"(?:每周|每个星期)([一二三四五六日天])")
+    # 每周X模式（带星期后缀，可选月份范围前缀）
+    _WEEKDAY_PATTERN = re.compile(r"(?:(?:下|这|上)个?月)?(?:每周|每个星期)([一二三四五六日天])")
 
     def resolve(self, text: str, base_date: Optional[datetime] = None) -> RecurrenceResult:
         """解析文本中的循环模式
@@ -267,7 +267,9 @@ class RecurrenceResolver:
         )
 
     def _try_weekday(self, text: str) -> RecurrenceResult:
-        """尝试匹配"每周X"/"每个星期X"
+        """尝试匹配"每周X"/"每个星期X"（可选月份范围前缀）
+
+        支持：每周五、下个月每周五、这个月每周五
 
         Returns:
             RecurrenceResult

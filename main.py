@@ -114,6 +114,8 @@ class VoiceCalendarApp:
             llm_provider=self.config.get("llm_provider", "ollama"),
             llm_model=self.config.get("llm_model", "qwen2.5:7b"),
             llm_base_url=self.config.get("llm_base_url", "http://localhost:11434"),
+            llm_parser_model=self.config.get("llm_parser_model", "qwen2.5:3b"),
+            llm_parser_timeout=self.config.get("llm_parser_timeout", 2.0),
         )
 
         # 指令补全器
@@ -246,12 +248,15 @@ class VoiceCalendarApp:
                 return
 
             # 2. 后处理链
-            text = self._run_post_process(text)
-            logger.info(f"识别结果: {text}")
-            self._result_queue.put(("voice_result", text, None))
+            # 解析路径：仅文本纠错（无标点，避免标点错误干扰拆分）
+            parse_text = self._run_text_correction(text)
+            # 展示路径：含标点恢复（给用户看）
+            display_text = self._run_post_process(text)
+            logger.info(f"识别结果: {display_text}")
+            self._result_queue.put(("voice_result", display_text, None))
 
-            # 3. 指令解析（支持多指令拆分）
-            commands = self._command_parser.parse_multiple(text)
+            # 3. 指令解析（使用无标点的纠错文本，支持多指令拆分）
+            commands = self._command_parser.parse_multiple(parse_text)
             logger.info(f"指令解析: 识别到 {len(commands)} 条指令")
 
             if not commands:
@@ -260,7 +265,16 @@ class VoiceCalendarApp:
 
             # 4. 逐条执行指令
             for cmd in commands:
-                logger.info(f"执行指令: type={cmd.command_type.value}, title='{cmd.title}'")
+                extra = []
+                if cmd.recurrence_rule:
+                    extra.append(f"rec={cmd.recurrence_rule}")
+                if cmd.priority > 0:
+                    pri_labels = {1: "重要", 2: "紧急", 3: "紧急+重要"}
+                    extra.append(f"pri={pri_labels.get(cmd.priority, cmd.priority)}")
+                if cmd.end_time:
+                    extra.append(f"end={cmd.end_time.strftime('%H:%M')}")
+                extra_str = f" [{', '.join(extra)}]" if extra else ""
+                logger.info(f"执行指令: type={cmd.command_type.value}, title='{cmd.title}'{extra_str}")
                 self._execute_command(cmd)
 
             # 5. 记录到交互日志（用于回放测试和模型训练）
@@ -295,13 +309,31 @@ class VoiceCalendarApp:
             logger.warning(f"交互日志写入失败: {e}")
 
     def _run_post_process(self, text: str) -> str:
-        """执行后处理链
+        """执行后处理链（用于 UI 展示，含标点恢复）
 
         Args:
-            text: 原始识别文本
+            text: 原始识别文本（无标点）
 
         Returns:
-            处理后的文本
+            处理后的文本（含标点，适合展示）
+        """
+        text = self._run_text_correction(text)
+
+        # 标点恢复（仅用于展示，解析路径不使用）
+        if self.config.get("punctuation_optimization", True):
+            text = self._punctuation_restorer.restore(text)
+            text = self._punctuation_processor.process(text)
+
+        return text
+
+    def _run_text_correction(self, text: str) -> str:
+        """执行文本纠错（不含标点恢复，用于解析路径）
+
+        Args:
+            text: 原始识别文本（无标点）
+
+        Returns:
+            纠错后的纯文本（无标点）
         """
         # 繁转简
         try:
@@ -314,11 +346,6 @@ class VoiceCalendarApp:
         # 同音纠错
         if self.config.get("text_correction", True):
             text = self._text_corrector.correct(text)
-
-        # 标点恢复
-        if self.config.get("punctuation_optimization", True):
-            text = self._punctuation_restorer.restore(text)
-            text = self._punctuation_processor.process(text)
 
         return text
 
@@ -341,9 +368,7 @@ class VoiceCalendarApp:
         elif cmd_type == CommandType.QUERY_EVENT:
             self._execute_query_event(command)
         elif cmd_type == CommandType.UPDATE_EVENT:
-            self._result_queue.put(
-                ("voice_state", VoiceState.SUCCESS, f"修改功能请通过界面操作: {command.original_text}")
-            )
+            self._execute_update_event(command)
         else:
             self._result_queue.put(("voice_state", VoiceState.ERROR, f"无法理解指令: {command.original_text}"))
 
@@ -390,13 +415,23 @@ class VoiceCalendarApp:
             self._result_queue.put(("voice_state", VoiceState.ERROR, msg))
             return
 
-        # 删除第一个匹配的事件
-        title = self._calendar.delete_event(events[0].id)
-        if title:
-            msg = f"已删除: {title}"
+        # 标题为空表示删除所有匹配事件（如“删除今天的所有事件”）
+        if not command.title and command.time:
+            deleted_count = 0
+            for event in events:
+                if self._calendar.delete_event(event.id):
+                    deleted_count += 1
+            date_str = command.time.strftime("%m月%d日")
+            msg = f"已删除 {date_str} 的 {deleted_count} 个事件"
             self._result_queue.put(("command_executed", msg, "delete"))
         else:
-            self._result_queue.put(("voice_state", VoiceState.ERROR, "删除失败"))
+            # 删除第一个匹配的事件
+            title = self._calendar.delete_event(events[0].id)
+            if title:
+                msg = f"已删除: {title}"
+                self._result_queue.put(("command_executed", msg, "delete"))
+            else:
+                self._result_queue.put(("voice_state", VoiceState.ERROR, "删除失败"))
 
     def _execute_query_event(self, command):
         """执行查询事件"""
@@ -414,6 +449,145 @@ class VoiceCalendarApp:
             msg = f"{date_str}没有事件"
 
         self._result_queue.put(("command_executed", msg, "query"))
+
+    def _execute_update_event(self, command):
+        """执行修改事件
+
+        解析层提供:
+        - command.title: 事件名称（用于搜索）
+        - command.time: 目标时间（绝对调整）或 None（相对偏移）
+        - command.end_time: 源时间（用于定位事件所在日期）
+        - command.original_text: 原始文本（用于提取偏移量）
+        """
+        from datetime import timedelta
+
+        title = command.title
+        target_time = command.time  # 目标时间（绝对）
+        source_time = command.end_time  # 源时间（用于定位事件）
+
+        if not title and not target_time and not source_time:
+            self._result_queue.put(("voice_state", VoiceState.ERROR, "无法识别要修改的事件"))
+            return
+
+        # 搜索匹配事件: title 精确匹配 → 源时间日期匹配 → 目标时间日期匹配
+        candidates = []
+        if title:
+            candidates = self._calendar.search_events(title)
+            # 如果有源时间，用它缩小范围
+            if candidates and source_time:
+                date_filtered = [e for e in candidates if e.start_time.date() == source_time.date()]
+                if date_filtered:
+                    candidates = date_filtered
+
+        if not candidates and source_time:
+            candidates = self._calendar.get_events_by_date(source_time)
+            # 如果有标题，进一步筛选
+            if candidates and title:
+                title_filtered = [e for e in candidates if title in e.title]
+                if title_filtered:
+                    candidates = title_filtered
+
+        if not candidates and target_time:
+            candidates = self._calendar.get_events_by_date(target_time)
+
+        if not candidates:
+            self._result_queue.put(
+                ("voice_state", VoiceState.ERROR, f"未找到匹配的事件: {title or command.original_text}")
+            )
+            return
+
+        # 多个候选时选时间最近的（未来优先）
+        from datetime import datetime as dt
+
+        now = dt.now()
+        candidates.sort(key=lambda e: (0 if e.start_time >= now else 1, abs((e.start_time - now).total_seconds())))
+        target_event = candidates[0]
+
+        # 确定更新内容
+        update_kwargs = {}
+        original_text = command.original_text
+
+        # 判断相对/绝对模式
+        is_relative = any(
+            kw in original_text for kw in ["推迟", "延后", "往后推", "向后推", "提前", "向前推", "往前推"]
+        )
+
+        if is_relative:
+            # 相对偏移：从原文提取偏移量
+            offset_minutes = self._parse_relative_offset(original_text, default=60)
+            if any(kw in original_text for kw in ["提前", "向前推", "往前推"]):
+                offset_minutes = -offset_minutes
+            new_start = target_event.start_time + timedelta(minutes=offset_minutes)
+            update_kwargs["start_time"] = new_start
+            if target_event.end_time and target_event.end_time != target_event.start_time:
+                update_kwargs["end_time"] = target_event.end_time + timedelta(minutes=offset_minutes)
+        elif target_time:
+            # 绝对时间更新
+            if target_time.hour == 0 and target_time.minute == 0:
+                # 目标时间只有日期，保留原事件时分
+                new_start = target_time.replace(
+                    hour=target_event.start_time.hour, minute=target_event.start_time.minute
+                )
+            else:
+                new_start = target_time
+            update_kwargs["start_time"] = new_start
+            if target_event.end_time and target_event.end_time != target_event.start_time:
+                duration = target_event.end_time - target_event.start_time
+                update_kwargs["end_time"] = new_start + duration
+        else:
+            self._result_queue.put(("voice_state", VoiceState.ERROR, "无法确定修改内容"))
+            return
+
+        # 执行更新
+        updated = self._calendar.update_event(target_event.id, **update_kwargs)
+        if updated:
+            new_time_str = update_kwargs["start_time"].strftime("%m月%d日 %H:%M")
+            msg = f"已修改: {target_event.title} → {new_time_str}"
+            logger.info(msg)
+            self._result_queue.put(("command_executed", msg, "update"))
+        else:
+            self._result_queue.put(("voice_state", VoiceState.ERROR, "修改失败"))
+
+    @staticmethod
+    def _parse_relative_offset(text: str, default: int = 60) -> int:
+        """从文本中提取相对偏移量（分钟）
+
+        支持: "N个小时", "N小时", "N分钟", "半小时"
+        默认返回 default 分钟
+        """
+        import re
+
+        # 半小时
+        if "半小时" in text or "半天" in text:
+            if "半天" in text:
+                return 720
+            return 30
+
+        # N个小时 / N小时
+        m = re.search(r"(\d+)\s*个?小时", text)
+        if m:
+            return int(m.group(1)) * 60
+
+        # N分钟
+        m = re.search(r"(\d+)\s*分钟?", text)
+        if m:
+            return int(m.group(1))
+
+        # 中文数字
+        cn_nums = {"一": 1, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+        m = re.search(r"([一两三四五六七八九十]+)\s*个?小时", text)
+        if m:
+            cn = m.group(1)
+            num = cn_nums.get(cn, 1)
+            return num * 60
+
+        m = re.search(r"([一两三四五六七八九十]+)\s*分钟?", text)
+        if m:
+            cn = m.group(1)
+            num = cn_nums.get(cn, default)
+            return num
+
+        return default
 
     # ================================================================
     # UI 回调与更新
