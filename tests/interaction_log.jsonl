@@ -41,3 +41,208 @@
 {"text": "今天上午十点不出门了晚上八点不上课了明天晚，上八点上课凌晨两点看英雄联盟比赛挪到后天两点。", "label": "delete_event", "expected_title": "上课", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
 {"text": "今天上午十点不出门了晚上八点不上课了明天晚，上八点上课凌晨两点看英雄联盟比赛挪到后天两点。", "label": "add_event", "expected_title": "上课", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
 {"text": "今天上午十点不出门了晚上八点不上课了明天晚，上八点上课凌晨两点看英雄联盟比赛挪到后天两点。", "label": "update_event", "expected_title": "看英雄联盟比赛", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "删除今天的所有事件。", "label": "delete_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "删除今天的所有事件。", "label": "add_event", "expected_title": "所有事件", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "删除明天下午1点，半起床打卡的事件。", "label": "delete_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "删除明天的所有事件。", "label": "delete_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "删除明天的所有事件。", "label": "add_event", "expected_title": "所有事件", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一上五十点公司团建。", "label": "add_event", "expected_title": "上", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每天早上七点起床打卡。", "label": "add_event", "expected_title": "起床打卡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每周五下午四点健身。", "label": "add_event", "expected_title": "健身", "expected_recurrence": "FREQ=WEEKLY;BYDAY=FR", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "重要的 后天晚上8点家庭去餐。", "label": "add_event", "expected_title": "家庭去餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "解极今天下午，两点项目评审会。", "label": "add_event", "expected_title": "项目评审会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午三点半和客户谈合作。", "label": "add_event", "expected_title": "和客户谈合作", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一上午十点公司团建。", "label": "add_event", "expected_title": "公司团建", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每天早上七点起床打卡。", "label": "add_event", "expected_title": "起床打卡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周每天早上七点起床打卡。", "label": "add_event", "expected_title": "起床打卡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下个月每周五下午四点健身。", "label": "add_event", "expected_title": "健身", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "这个月每周，五下午四点健身了。", "label": "add_event", "expected_title": "健身了", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天晚上8点家庭聚餐。", "label": "add_event", "expected_title": "家庭聚餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "重要的后天晚上8点家庭聚餐。", "label": "add_event", "expected_title": "家庭聚餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "紧急的今天下午两点项目评审会。", "label": "add_event", "expected_title": "项目评审会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天上午900看牙医。", "label": "add_event", "expected_title": "900看牙医", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "删除后间上午酒店看牙译。", "label": "delete_event", "expected_title": "后间", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "删除后间上午酒店看牙译。", "label": "add_event", "expected_title": "酒店看牙译", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "查看本周所有安排。", "label": "add_event", "expected_title": "查看本周所有", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "下个月1号上午9点年度总结会。", "label": "add_event", "expected_title": "下个月", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下个月1号上午9点年度总结会。", "label": "add_event", "expected_title": "年度总结会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午三点八和客户谈合作", "label": "add_event", "expected_title": "八和客户谈合作", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午三点半和客户谈合作", "label": "add_event", "expected_title": "和客户谈合作", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一上午十点公司团建", "label": "add_event", "expected_title": "公司团建", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每天早上七点起床打卡", "label": "add_event", "expected_title": "起床打卡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周每天早上七点起床打卡", "label": "add_event", "expected_title": "起床打卡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下个月每周五下午四点健身", "label": "add_event", "expected_title": "健身", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下个月每周五下午四点健身", "label": "add_event", "expected_title": "健身", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "重要的后天晚上8点家庭聚餐", "label": "add_event", "expected_title": "家庭聚餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "紧急的今天下午两点项目评审会", "label": "add_event", "expected_title": "项目评审会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天开会 大概是下午两点", "label": "add_event", "expected_title": "开会 是", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "山除后天的鸭鱼", "label": "add_event", "expected_title": "山除的鸭鱼", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "删除后天的牙医愈", "label": "delete_event", "expected_title": "牙医愈", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "山厨后天上午九点看牙姨的世界", "label": "add_event", "expected_title": "看牙姨的世界", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天上午9点不看牙医了", "label": "delete_event", "expected_title": "看牙医", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "查看本周的所有安排", "label": "query_event", "expected_title": "本周的", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "下个月1号上午十点年度总结会", "label": "add_event", "expected_title": "年度总结会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "山图下周一的所有事件", "label": "add_event", "expected_title": "山图的", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天上午十点去银行删掉上周的购物提醒每周二下午一点学英语", "label": "delete_event", "expected_title": "银行上周的购物提醒每", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "明天上午十点去银行删掉上周的购物提醒每周二下午一点学英语", "label": "add_event", "expected_title": "学英语", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天凌晨一点半赶飞机下下周四下午两点半面试工作日早上八点半打卡上个月最后一天的报表要记录本月十五号晚上七点生日聚餐", "label": "add_event", "expected_title": "赶飞机下", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天凌晨一点半赶飞机下下周四下午两点半面试工作日早上八点半打卡上个月最后一天的报表要记录本月十五号晚上七点生日聚餐", "label": "add_event", "expected_title": "面试", "expected_recurrence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天凌晨一点半赶飞机下下周四下午两点半面试工作日早上八点半打卡上个月最后一天的报表要记录本月十五号晚上七点生日聚餐", "label": "add_event", "expected_title": "打卡", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天凌晨一点半赶飞机下下周四下午两点半面试工作日早上八点半打卡上个月最后一天的报表要记录本月十五号晚上七点生日聚餐", "label": "add_event", "expected_title": "一天的报表本月", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "后天凌晨一点半赶飞机下下周四下午两点半面试工作日早上八点半打卡上个月最后一天的报表要记录本月十五号晚上七点生日聚餐", "label": "add_event", "expected_title": "生日聚餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午三点开会", "label": "add_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天上午十点看牙医", "label": "add_event", "expected_title": "看牙医", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天晚上8点跑吧", "label": "add_event", "expected_title": "跑", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "大后天下午2点面试", "label": "add_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一上午十点公司团建", "label": "add_event", "expected_title": "公司团建", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周三下午四点半和客户簽合同", "label": "add_event", "expected_title": "和客户签合同", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "6月15日 下午3点体检", "label": "add_event", "expected_title": "体检", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天十五点三十会报工作", "label": "add_event", "expected_title": "十五点三十会报工作", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天十五点半汇报工作", "label": "add_event", "expected_title": "十五点半汇报工作", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "我安排明天下午3点的团队会议", "label": "add_event", "expected_title": "团队会议", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "更加一个下周一上午十点的面试", "label": "add_event", "expected_title": "更", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "更加一个下周一上午十点的面试", "label": "add_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "提醒我后天晚上7点吃", "label": "add_event", "expected_title": "吃", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "提醒我后天晚上七点吃药", "label": "add_event", "expected_title": "吃药", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "听见一个6月20号的生日聚会", "label": "add_event", "expected_title": "听见的生日聚会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "记录一下下周五下午两点的牙科医院", "label": "add_event", "expected_title": "牙科医院", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "我寄明天早上9点去银行办事", "label": "add_event", "expected_title": "银行办事", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我寄昨天晚上五点打球", "label": "add_event", "expected_title": "寄晚点打球", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "清晨七点半 跑步", "label": "add_event", "expected_title": "跑步", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "青晨去公园散步", "label": "add_event", "expected_title": "公园散步", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "本夜十一点看球赛", "label": "add_event", "expected_title": "本夜看球赛", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "从五点出发去机场", "label": "add_event", "expected_title": "从出发去机场", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "午夜零点跨年倒计时", "label": "add_event", "expected_title": "零点跨年倒计时", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "月底交报告", "label": "add_event", "expected_title": "交报告", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "月底之前完成设计稿", "label": "add_event", "expected_title": "之前完成设计稿", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "月初开会 讨论新项目", "label": "add_event", "expected_title": "开会 讨论新项目", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "年底总结汇报", "label": "add_event", "expected_title": "总结汇报", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "年初制定新计划", "label": "query_event", "expected_title": "制定新", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "延出制定新计划", "label": "query_event", "expected_title": "延出制定新", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "年初制定新计划", "label": "query_event", "expected_title": "制定新", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "周末聚餐", "label": "add_event", "expected_title": "聚餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "周末下午三点去看电影", "label": "add_event", "expected_title": "看电影", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "周末带孩子去游乐园", "label": "add_event", "expected_title": "带孩子去游乐园", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "删除明天的会议", "label": "delete_event", "expected_title": "会议", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "取消后天的面试", "label": "delete_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "删除后天的面试", "label": "delete_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "去掉今天晚上的跑步", "label": "delete_event", "expected_title": "地跑步", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "除今天的所有事件", "label": "add_event", "expected_title": "除的", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "删除明天的所有事件", "label": "delete_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "删除今天的所有事件", "label": "delete_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "取消下周三的客户会面", "label": "delete_event", "expected_title": "客户会面", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "明天不开会了", "label": "delete_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "后天不去看牙医", "label": "add_event", "expected_title": "不去看牙医", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天别去看牙", "label": "add_event", "expected_title": "别去看牙", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天不加班了", "label": "delete_event", "expected_title": "加班", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "莫不拒餐了", "label": "delete_event", "expected_title": "拒餐", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "周末补巨餐", "label": "add_event", "expected_title": "补巨餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周不用团建了", "label": "delete_event", "expected_title": "用团建", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "下周一不用团建了", "label": "delete_event", "expected_title": "用团建", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "今天有什么安排", "label": "query_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "这周有哪些日常", "label": "query_event", "expected_title": "常", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "下周不用团建了", "label": "delete_event", "expected_title": "用团建", "expected_recurrence": "", "confidence": 0.7, "note": "自动记录", "accepted": true}
+{"text": "下周有什么安排", "label": "query_event", "expected_title": "下周", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "下周有什么安排", "label": "query_event", "expected_title": "下周", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "看看今天的形成", "label": "query_event", "expected_title": "形成", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "查看本周所有安排", "label": "query_event", "expected_title": "本周", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "查看下个月的日常", "label": "query_event", "expected_title": "下月的日常", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "把明天的会改到后天", "label": "update_event", "expected_title": "明天的会", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "推遲明天的面试", "label": "update_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "把下周一的会议提前到这周五", "label": "update_event", "expected_title": "会议到这周五", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "改一下后天的时间", "label": "update_event", "expected_title": "时间", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "罗道三十号", "label": "add_event", "expected_title": "罗道", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "向前推一个小时", "label": "update_event", "expected_title": "小时", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "每天早上七点起床打卡", "label": "add_event", "expected_title": "起床打卡", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每周五下午四点健身", "label": "add_event", "expected_title": "健身", "expected_recurrence": "FREQ=WEEKLY;BYDAY=FR", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每周六下午五点见证", "label": "add_event", "expected_title": "见证", "expected_recurrence": "FREQ=WEEKLY;BYDAY=SA", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每周六下午五点健身", "label": "add_event", "expected_title": "健身", "expected_recurrence": "FREQ=WEEKLY;BYDAY=SA", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每个工作日早上9点打卡", "label": "add_event", "expected_title": "打卡", "expected_recurrence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每个月1号交房租", "label": "add_event", "expected_title": "交房租", "expected_recurrence": "FREQ=MONTHLY;BYMONTHDAY=1", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每年6月1号儿童节活", "label": "add_event", "expected_title": "儿童节活", "expected_recurrence": "FREQ=YEARLY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每天中午十二点吃药", "label": "add_event", "expected_title": "吃药", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每周三晚上八点英语课", "label": "add_event", "expected_title": "英语课", "expected_recurrence": "FREQ=WEEKLY;BYDAY=WE", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "每天下午三点喝水", "label": "add_event", "expected_title": "喝水", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周每天早上七点起床", "label": "add_event", "expected_title": "起床", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周每天下午两点开会", "label": "add_event", "expected_title": "开会", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "这周每天晚上逃步", "label": "add_event", "expected_title": "逃步", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下个月每周五下午四点健身", "label": "add_event", "expected_title": "健身", "expected_recurrence": "FREQ=WEEKLY;BYDAY=FR", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "重要的 后天晚上8点家庭聚餐", "label": "add_event", "expected_title": "家庭聚餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "本期的今天下午两点项目评审", "label": "add_event", "expected_title": "项目评审", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "几且重要的明天上午9点客户汇报", "label": "add_event", "expected_title": "客户汇报", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "必须在明天之前完成报告", "label": "add_event", "expected_title": "在之前完成报告", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午两点开会三小时", "label": "add_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天上午九点面试一个半小时", "label": "add_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天下午跑步半小时", "label": "add_event", "expected_title": "跑步", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一下午两点培训一整天", "label": "add_event", "expected_title": "培训", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下午两点开会 晚上八点跑步", "label": "add_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下午两点开会 晚上八点跑步", "label": "add_event", "expected_title": "跑步", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午2点开会 晚上8点跑", "label": "add_event", "expected_title": "开会 晚上8点跑", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天上午时点看牙还有下午三点取快递", "label": "add_event", "expected_title": "时点看牙", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后天上午时点看牙还有下午三点取快递", "label": "add_event", "expected_title": "取快递", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一面试下周三报告", "label": "add_event", "expected_title": "面试下周三报告", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天9点开会10点面试下午3点签合同", "label": "add_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天9点开会10点面试下午3点签合同", "label": "add_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天9点开会10点面试下午3点签合同", "label": "add_event", "expected_title": "签合同", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天9点开会10点面试下午3点前合同", "label": "add_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天9点开会10点面试下午3点前合同", "label": "add_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天9点开会10点面试下午3点前合同", "label": "add_event", "expected_title": "前合同", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "提醒我后天去医院以及下周五交论", "label": "add_event", "expected_title": "医院", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "提醒我后天去医院以及下周五交论", "label": "add_event", "expected_title": "交论", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天上午十点开会下午两点面试晚上七点聚餐", "label": "add_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天上午十点开会下午两点面试晚上七点聚餐", "label": "add_event", "expected_title": "面试", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "今天上午十点开会下午两点面试晚上七点聚餐", "label": "add_event", "expected_title": "聚餐", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一早上9点打卡10点培训下午3点述职", "label": "add_event", "expected_title": "打卡", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一早上9点打卡10点培训下午3点述职", "label": "add_event", "expected_title": "培训", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一早上9点打卡10点培训下午3点述职", "label": "add_event", "expected_title": "述职", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "后厅上午体检下午交材料", "label": "add_event", "expected_title": "后厅体检下午交材料", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "删除后天的压力", "label": "delete_event", "expected_title": "压力", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "山土下周一的所有事件", "label": "add_event", "expected_title": "山土的", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "删除下周一的所有事件", "label": "delete_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "取消明天的会议", "label": "delete_event", "expected_title": "会议", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "今天开会 大概是下午两点", "label": "add_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我加个明天下午3点的会", "label": "add_event", "expected_title": "会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "给我订个后天的闹钟", "label": "add_event", "expected_title": "订的闹钟", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "设个明天早上七点的提醒", "label": "add_event", "expected_title": "提醒", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "安排下周二出差", "label": "add_event", "expected_title": "出差", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "记一下明天要去超市买东西", "label": "add_event", "expected_title": "记去超市买东西", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "三天后上午九点出发", "label": "add_event", "expected_title": "出发", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "五天后 下午两点复诊", "label": "add_event", "expected_title": "复诊", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "两小时后提醒我喝水", "label": "add_event", "expected_title": "喝水", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "三十分钟后叫我", "label": "add_event", "expected_title": "叫我", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "昨天下午3点的会议记录", "label": "add_event", "expected_title": "会议", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "前天上午十点面试的反馈", "label": "add_event", "expected_title": "面试的反馈", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "上周五的项目进展", "label": "add_event", "expected_title": "项目进展", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天上午9点先去银行办卡然后10点半去物业交水电费中午回来休息下午2点出发去机场接人晚上一起吃饭", "label": "add_event", "expected_title": "先去银行办卡", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天上午9点先去银行办卡然后10点半去物业交水电费中午回来休息下午2点出发去机场接人晚上一起吃饭", "label": "add_event", "expected_title": "交水电费", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天上午9点先去银行办卡然后10点半去物业交水电费中午回来休息下午2点出发去机场接人晚上一起吃饭", "label": "add_event", "expected_title": "回来休息", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天上午9点先去银行办卡然后10点半去物业交水电费中午回来休息下午2点出发去机场接人晚上一起吃饭", "label": "add_event", "expected_title": "出发去机场接人", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天上午9点先去银行办卡然后10点半去物业交水电费中午回来休息下午2点出发去机场接人晚上一起吃饭", "label": "add_event", "expected_title": "一起吃饭", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我安排一下这周的计划周一上午开会 下午写代码周二全天出差周三上午培训 下午写报告周四合客户开会周五下午Teen Building", "label": "query_event", "expected_title": "这周的", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "帮我安排一下这周的计划周一上午开会 下午写代码周二全天出差周三上午培训 下午写报告周四合客户开会周五下午Teen Building", "label": "add_event", "expected_title": "开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我安排一下这周的计划周一上午开会 下午写代码周二全天出差周三上午培训 下午写报告周四合客户开会周五下午Teen Building", "label": "add_event", "expected_title": "写代码", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我安排一下这周的计划周一上午开会 下午写代码周二全天出差周三上午培训 下午写报告周四合客户开会周五下午Teen Building", "label": "add_event", "expected_title": "全天出差", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我安排一下这周的计划周一上午开会 下午写代码周二全天出差周三上午培训 下午写报告周四合客户开会周五下午Teen Building", "label": "add_event", "expected_title": "培训", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我安排一下这周的计划周一上午开会 下午写代码周二全天出差周三上午培训 下午写报告周四合客户开会周五下午Teen Building", "label": "add_event", "expected_title": "写报告", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我安排一下这周的计划周一上午开会 下午写代码周二全天出差周三上午培训 下午写报告周四合客户开会周五下午Teen Building", "label": "add_event", "expected_title": "合客户开会", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "帮我安排一下这周的计划周一上午开会 下午写代码周二全天出差周三上午培训 下午写报告周四合客户开会周五下午Teen Building", "label": "add_event", "expected_title": "Teen Building", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一到周五每天上午9点到12点都要培训下午2点到5点自习晚上7点到9点复习", "label": "add_event", "expected_title": "到", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一到周五每天上午9点到12点都要培训下午2点到5点自习晚上7点到9点复习", "label": "add_event", "expected_title": "到", "expected_recurrence": "FREQ=DAILY", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一到周五每天上午9点到12点都要培训下午2点到5点自习晚上7点到9点复习", "label": "add_event", "expected_title": "培训", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一到周五每天上午9点到12点都要培训下午2点到5点自习晚上7点到9点复习", "label": "add_event", "expected_title": "自习", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周一到周五每天上午9点到12点都要培训下午2点到5点自习晚上7点到9点复习", "label": "add_event", "expected_title": "复习", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "昨天没完成的事情都挪到明天", "label": "update_event", "expected_title": "昨天没完成的事情", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "跟周二的时间安排对调", "label": "add_event", "expected_title": "跟的时间对调", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "跟周二的安排对调一下", "label": "add_event", "expected_title": "跟的对调", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "明天都会往后延伴", "label": "add_event", "expected_title": "会往后延伴", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天的会 往后延半前", "label": "add_event", "expected_title": "会 往后延半前", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "周末有空的话去建设", "label": "add_event", "expected_title": "有空的话去建设", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下个端午节 放假前一天 提前我买粽子", "label": "update_event", "expected_title": "下端午节 放假前一天 我买粽子", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "国庆节后第一个工作日上午开会", "label": "add_event", "expected_title": "国庆节后第开会", "expected_recurrence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "如果明天下雨就取消跑步改成室内健身", "label": "delete_event", "expected_title": "如果下雨就跑步改成室内健身", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "今天天气怎么样", "label": "add_event", "expected_title": "天气怎么样", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午3点看牙", "label": "add_event", "expected_title": "看牙", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "把看牙改到后天", "label": "update_event", "expected_title": "看牙", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "把看牙改到后天下午四点", "label": "update_event", "expected_title": "看牙", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "把看牙推迟一个小时", "label": "update_event", "expected_title": "看牙小时", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "推迟看牙一个小时", "label": "update_event", "expected_title": "看牙小时", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}

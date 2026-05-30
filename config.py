@@ -14,6 +14,7 @@ class Config:
         "hotkey": "right alt",
         "hotkey_mode": "hold",  # hold: 按住录音, toggle: 切换录音
         # 语音识别设置
+        "asr_engine": "paraformer",  # paraformer / whisper
         "model_size": "small",
         "language": "zh",
         "beam_size": 5,

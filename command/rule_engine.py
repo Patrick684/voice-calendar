@@ -181,17 +181,12 @@ class RuleEngine:
     TITLE_LEAD_NOISE = ["的", "了", "吧", "呢", "啊", "一个", "一条", "我"]
 
     # 优先级关键词（按优先级降序排列）
-    PRIORITY_CRITICAL_WORDS = ["\u7d27\u6025\u4e14\u91cd\u8981", "\u65e2\u7d27\u6025\u53c8\u91cd\u8981"]
+    PRIORITY_CRITICAL_WORDS = ["紧急且重要", "既紧急又重要"]
     PRIORITY_URGENT_WORDS = [
-        "\u7d27\u6025",
-        "\u5fc5\u987b",
-        "\u622a\u6b62",
+        "紧急",
         "deadline",
-        "\u9a6c\u4e0a",
-        "\u7acb\u523b",
-        "\u5c3d\u5feb",
     ]
-    PRIORITY_IMPORTANT_WORDS = ["\u91cd\u8981", "\u52a1\u5fc5", "\u4e00\u5b9a", "\u4e0d\u80fd\u5fd8"]
+    PRIORITY_IMPORTANT_WORDS = ["重要"]
 
     # 循环事件关键词 → RRULE 映射
     # 格式: (关键词, FREQ, 附加参数)
