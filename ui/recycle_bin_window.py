@@ -38,6 +38,8 @@ class RecycleBinWindow(ctk.CTkToplevel):
         self._on_restore = on_restore
         self._on_hard_delete = on_hard_delete
         self._on_clear_all = on_clear_all
+        self._sort_mode = "delete_time"  # "delete_time" | "event_date"
+        self._events = events
 
         self._build_ui()
         self._render_events(events)
@@ -78,6 +80,33 @@ class RecycleBinWindow(ctk.CTkToplevel):
             text_color="gray",
         ).pack(padx=10, anchor="w", pady=(4, 0))
 
+        # 排序切换栏
+        sort_frame = ctk.CTkFrame(self, fg_color="transparent")
+        sort_frame.pack(fill="x", padx=10, pady=(4, 0))
+
+        self._sort_delete_btn = ctk.CTkButton(
+            sort_frame,
+            text="按删除时间",
+            width=70,
+            height=22,
+            font=ctk.CTkFont(size=10),
+            command=lambda: self._switch_sort("delete_time"),
+        )
+        self._sort_delete_btn.pack(side="left", padx=(0, 4))
+
+        self._sort_event_btn = ctk.CTkButton(
+            sort_frame,
+            text="按事件日期",
+            width=70,
+            height=22,
+            font=ctk.CTkFont(size=10),
+            fg_color="transparent",
+            text_color="gray",
+            hover_color=("#e0e0e0", "#3a3a3a"),
+            command=lambda: self._switch_sort("event_date"),
+        )
+        self._sort_event_btn.pack(side="left")
+
         # 事件滚动列表
         self._scroll_frame = ctk.CTkScrollableFrame(self)
         self._scroll_frame.pack(fill="both", expand=True, padx=8, pady=(8, 8))
@@ -91,8 +120,29 @@ class RecycleBinWindow(ctk.CTkToplevel):
             command=self._on_close,
         ).pack(pady=(0, 10))
 
+    def _switch_sort(self, mode: str):
+        """切换排序模式"""
+        if mode == self._sort_mode:
+            return
+        self._sort_mode = mode
+        # 更新按钮样式（选中状态）
+        if mode == "delete_time":
+            self._sort_delete_btn.configure(
+                fg_color=ctk.ThemeManager.theme["CTkButton"]["fg_color"],
+                text_color=ctk.ThemeManager.theme["CTkButton"]["text_color"],
+            )
+            self._sort_event_btn.configure(fg_color="transparent", text_color="gray")
+        else:
+            self._sort_event_btn.configure(
+                fg_color=ctk.ThemeManager.theme["CTkButton"]["fg_color"],
+                text_color=ctk.ThemeManager.theme["CTkButton"]["text_color"],
+            )
+            self._sort_delete_btn.configure(fg_color="transparent", text_color="gray")
+        self._render_events(self._events)
+
     def _render_events(self, events: list):
-        """渲染已删除事件列表（按日期分组）"""
+        """渲染已删除事件列表（按当前排序模式分组）"""
+        self._events = events
         for widget in self._scroll_frame.winfo_children():
             widget.destroy()
 
@@ -107,20 +157,37 @@ class RecycleBinWindow(ctk.CTkToplevel):
             ).pack(pady=30)
             return
 
-        # 按日期分组
-        current_date = None
-        for event in events:
-            event_date = event.start_time.strftime("%Y-%m-%d")
-            if event_date != current_date:
-                current_date = event_date
-                # 日期分割线
-                ctk.CTkLabel(
-                    self._scroll_frame,
-                    text=f"────── {current_date} ──────",
-                    font=ctk.CTkFont(size=11),
-                    text_color="#666666",
-                ).pack(fill="x", pady=(6, 2))
-            self._create_event_card(event)
+        # 排序 + 分组
+        if self._sort_mode == "delete_time":
+            # 按删除时间倒序（已由 storage 返回），按删除日期分组
+            sorted_events = events
+            current_group = None
+            for event in sorted_events:
+                group_key = event.deleted_at[:10] if event.deleted_at else "未知"
+                if group_key != current_group:
+                    current_group = group_key
+                    ctk.CTkLabel(
+                        self._scroll_frame,
+                        text=f"──── 删除于 {current_group} ────",
+                        font=ctk.CTkFont(size=11),
+                        text_color="#666666",
+                    ).pack(fill="x", pady=(6, 2))
+                self._create_event_card(event)
+        else:
+            # 按事件日期排序
+            sorted_events = sorted(events, key=lambda e: e.start_time)
+            current_group = None
+            for event in sorted_events:
+                group_key = event.start_time.strftime("%Y-%m-%d")
+                if group_key != current_group:
+                    current_group = group_key
+                    ctk.CTkLabel(
+                        self._scroll_frame,
+                        text=f"────── {current_group} ──────",
+                        font=ctk.CTkFont(size=11),
+                        text_color="#666666",
+                    ).pack(fill="x", pady=(6, 2))
+                self._create_event_card(event)
 
     def _create_event_card(self, event: CalendarEvent):
         """创建回收站事件卡片（含恢复/删除按钮）"""
