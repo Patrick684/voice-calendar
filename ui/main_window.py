@@ -473,15 +473,16 @@ class MainWindow(ctk.CTk):
             card.configure(height=36)
             card.pack_propagate(False)
 
-        # 分类颜色条
+        # 分类颜色条（height=1 避免默认 250px，fill=y 自适应卡片高度）
         cat_color = self._category_colors.get(event.category, "#757575")
-        ctk.CTkFrame(card, width=4, fg_color=cat_color, corner_radius=2).pack(
+        ctk.CTkFrame(card, width=4, height=1, fg_color=cat_color, corner_radius=2).pack(
             side="left", fill="y", padx=(2, 0), pady=2
         )
 
         # 第一行容器（标题 + 分类在同一行）
-        row = ctk.CTkFrame(card, fg_color="transparent")
-        row.pack(side="top", fill="x", pady=(2, 0))
+        row = ctk.CTkFrame(card, fg_color="transparent", height=18, corner_radius=0)
+        row.pack(side="top", fill="x", pady=(1, 0))
+        row.pack_propagate(False)
 
         # 时间 + 标题 + 优先级
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
@@ -502,7 +503,8 @@ class MainWindow(ctk.CTk):
             text=title_text,
             font=ctk.CTkFont(size=14),
             anchor="w",
-        ).pack(side="left", padx=(8, 0))
+            height=16,
+        ).pack(side="left", padx=(8, 0), fill="y")
 
         # 分类标签（同行右侧）
         if event.category:
@@ -511,9 +513,10 @@ class MainWindow(ctk.CTk):
                 text=event.category,
                 font=ctk.CTkFont(size=12),
                 text_color=cat_color,
-            ).pack(side="right", padx=(0, 8))
+                height=16,
+            ).pack(side="right", padx=(0, 8), fill="y")
 
-        # 描述行（有描述时显示，卡片高度自动扩展）
+        # 描述行（有描述时显示，单行紧凑/多行自动扩展）
         if event.description:
             ctk.CTkLabel(
                 card,
@@ -522,7 +525,7 @@ class MainWindow(ctk.CTk):
                 text_color="#888888",
                 anchor="w",
                 wraplength=240,
-            ).pack(side="top", fill="x", padx=(14, 0), pady=(0, 2))
+            ).pack(side="top", fill="x", padx=(14, 0), pady=(0, 1))
 
         # 右键菜单（快捷编辑）
         if event.id is not None:
