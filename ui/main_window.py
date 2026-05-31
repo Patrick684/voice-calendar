@@ -465,7 +465,7 @@ class MainWindow(ctk.CTk):
 
     def _create_event_card(self, event: CalendarEvent):
         """创建事件卡片（紧凑布局 + 描述自适应高度）"""
-        card = ctk.CTkFrame(self._event_scroll, corner_radius=4)
+        card = ctk.CTkFrame(self._event_scroll, corner_radius=2)
         card.pack(fill="x", pady=2)
 
         # 无描述时固定高度，有描述时自适应
@@ -476,12 +476,12 @@ class MainWindow(ctk.CTk):
         # 分类颜色条
         cat_color = self._category_colors.get(event.category, "#757575")
         ctk.CTkFrame(card, width=4, fg_color=cat_color, corner_radius=2).pack(
-            side="left", fill="y", padx=(3, 0), pady=2
+            side="left", fill="y", padx=(2, 0), pady=2
         )
 
         # 第一行容器（标题 + 分类在同一行）
         row = ctk.CTkFrame(card, fg_color="transparent")
-        row.pack(side="top", fill="x", pady=(3, 0))
+        row.pack(side="top", fill="x", pady=(2, 0))
 
         # 时间 + 标题 + 优先级
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
@@ -522,7 +522,7 @@ class MainWindow(ctk.CTk):
                 text_color="#888888",
                 anchor="w",
                 wraplength=240,
-            ).pack(side="top", fill="x", padx=(14, 0), pady=(0, 3))
+            ).pack(side="top", fill="x", padx=(14, 0), pady=(0, 2))
 
         # 右键菜单（快捷编辑）
         if event.id is not None:
@@ -569,9 +569,11 @@ class MainWindow(ctk.CTk):
             text=f"为「{cal_event.title}」修改描述：",
             title="修改描述",
         )
-        # 预填充已有描述
+        # 预填充已有描述（_entry 是延迟创建的，需等 widget 就绪）
         if cal_event.description:
-            dialog._entry.insert(0, cal_event.description)
+            dialog.after(
+                200, lambda: dialog._entry.insert(0, cal_event.description)
+            )
 
         result = dialog.get_input()
         if result is not None:
