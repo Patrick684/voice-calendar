@@ -379,12 +379,6 @@ class MainWindow(ctk.CTk):
         for widget in self._event_scroll.winfo_children():
             widget.destroy()
 
-        # 恢复滚动位置（或重置到顶部）
-        try:
-            self._event_scroll._parent_canvas.yview_moveto(scroll_pos if keep_scroll else 0)
-        except Exception:
-            pass
-
         # 清空分组 widget 引用
         self._priority_group_widgets = {}
 
@@ -417,6 +411,22 @@ class MainWindow(ctk.CTk):
         else:
             for event in events:
                 self._create_event_card(event)
+
+        # 恢复滚动位置（必须在卡片创建后执行）
+        if keep_scroll:
+            self.after(20, lambda: self._restore_scroll(scroll_pos))
+        else:
+            try:
+                self._event_scroll._parent_canvas.yview_moveto(0)
+            except Exception:
+                pass
+
+    def _restore_scroll(self, pos: float):
+        """延迟恢复滚动位置（等待 canvas 更新 scroll region）"""
+        try:
+            self._event_scroll._parent_canvas.yview_moveto(pos)
+        except Exception:
+            pass
 
     def _render_priority_groups(self, events):
         """按优先级分组渲染事件列表（含分组标题）"""
@@ -556,8 +566,8 @@ class MainWindow(ctk.CTk):
             self._click_open_timer = None
 
         dialog = ctk.CTkInputDialog(
-            text=f"为「{cal_event.title}」添加描述：",
-            title="编辑描述",
+            text=f"为「{cal_event.title}」修改描述：",
+            title="修改描述",
         )
         # 预填充已有描述
         if cal_event.description:
