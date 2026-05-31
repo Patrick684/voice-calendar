@@ -128,7 +128,7 @@ class VoicePanel(ctk.CTkFrame):
             self._voice_btn.configure(text="🎤 语音输入")
 
         if state == VoiceState.SUCCESS and message:
-            self._result_label.configure(text=message, text_color="white")
+            self._result_label.configure(text="", text_color="white")
         elif state == VoiceState.ERROR and message:
             self._result_label.configure(text=f"错误: {message}", text_color="#e74c3c")
         elif state == VoiceState.RECORDING:

@@ -102,6 +102,36 @@ python main.py
 
 MIT License
 
+## 演示视频
+
+> 🎬 [Demo 视频链接（待补充）](#)
+
+## 第三方依赖与致谢
+
+本项目使用了以下开源框架和库：
+
+| 依赖 | 用途 | 许可证 |
+|------|------|--------|
+| [FunASR (Paraformer)](https://github.com/modelscope/FunASR) | 本地语音识别引擎 | Apache-2.0 |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | 备用语音识别引擎 | MIT |
+| [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) | GUI 界面框架 | MIT |
+| [PyTorch](https://pytorch.org/) | 深度学习框架 | BSD-3-Clause |
+| [Transformers](https://github.com/huggingface/transformers) | 意图分类模型推理 | Apache-2.0 |
+| [keyboard](https://github.com/boppreh/keyboard) | 全局快捷键监听 | MIT |
+| [python-dateutil](https://github.com/dateutil/dateutil) | 日期时间解析（RRULE） | Apache-2.0 |
+| [pypinyin](https://github.com/mozillazg/python-pinyin) | 汉字拼音转换（近音纠错） | MIT |
+| [scikit-learn](https://scikit-learn.org/) | 意图分类模型训练 | BSD-3-Clause |
+| [Inno Setup](https://jrsoftware.org/isinfo.php) | Windows 安装包构建 | Inno Setup License |
+| [PyInstaller](https://pyinstaller.org/) | Python 应用打包 | GPL-2.0 (bootloader: Apache-2.0) |
+
+## 代码来源
+
+本项目的语音识别引擎封装、音频录制模块、热词管理等基础设施代码复用自作者早期项目：
+
+> **[voice-input-method](https://github.com/Patrick684/voice-input-method)** — 基于本地语音识别的 Windows 输入法工具
+
+在原项目基础上，本项目新增了日历管理、中文时间语义解析、指令解析引擎、意图分类模型、GUI 交互等全部业务功能。
+
 ---
 
 > 技术架构与开发文档见 [docs/DESIGN.md](docs/DESIGN.md)

@@ -107,17 +107,22 @@ class RecurrenceResolver:
         "天": "SU",
     }
 
-    # 普通循环模式（沿用 RuleEngine 的列表）
+    # 普通循环模式（按优先级排序，长关键词优先）
     RECURRENCE_PATTERNS = [
-        ("每个工作日", "WEEKLY", "BYDAY=MO,TU,WE,TH,FR"),
-        ("每个星期", "WEEKLY", ""),
-        ("每周", "WEEKLY", ""),
-        ("每个月", "MONTHLY", ""),
-        ("每月", "MONTHLY", ""),
-        ("每年", "YEARLY", ""),
-        ("每天", "DAILY", ""),
-        ("每日", "DAILY", ""),
-        ("工作日", "WEEKLY", "BYDAY=MO,TU,WE,TH,FR"),
+        ("\u5de5\u4f5c\u65e5\u6bcf\u5929", "WEEKLY", "BYDAY=MO,TU,WE,TH,FR"),
+        ("\u4f11\u606f\u65e5\u6bcf\u5929", "WEEKLY", "BYDAY=SA,SU"),
+        ("\u6bcf\u4e2a\u5de5\u4f5c\u65e5", "WEEKLY", "BYDAY=MO,TU,WE,TH,FR"),
+        ("\u6bcf\u4e2a\u4f11\u606f\u65e5", "WEEKLY", "BYDAY=SA,SU"),
+        ("\u6bcf\u4e2a\u661f\u671f", "WEEKLY", ""),
+        ("\u6bcf\u5468", "WEEKLY", ""),
+        ("\u6bcf\u4e2a\u6708", "MONTHLY", ""),
+        ("\u6bcf\u6708", "MONTHLY", ""),
+        ("\u6bcf\u5e74", "YEARLY", ""),
+        ("\u5de5\u4f5c\u65e5", "WEEKLY", "BYDAY=MO,TU,WE,TH,FR"),
+        ("\u4f11\u606f\u65e5", "WEEKLY", "BYDAY=SA,SU"),
+        ("\u5468\u672b", "WEEKLY", "BYDAY=SA,SU"),
+        ("\u6bcf\u5929", "DAILY", ""),
+        ("\u6bcf\u65e5", "DAILY", ""),
     ]
 
     # 周范围 + 每天模式: (下周|这周|上周) + 每天
@@ -283,9 +288,19 @@ class RecurrenceResolver:
         if not day_code:
             return RecurrenceResult(cleaned_text=text)
 
+        # 计算下一个正确星期几作为 start_time
+        target_weekday = list(self.WEEKDAY_MAP.values()).index(day_code)  # 0=MO ... 6=SU
+        today = datetime.now()
+        today_weekday = today.weekday()  # 0=Monday
+        days_ahead = target_weekday - today_weekday
+        if days_ahead <= 0:
+            days_ahead += 7
+        next_occurrence = today.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=days_ahead)
+
         cleaned = text[: m.start()] + text[m.end() :]
         return RecurrenceResult(
             rule=f"FREQ=WEEKLY;BYDAY={day_code}",
+            start_time=next_occurrence,
             cleaned_text=cleaned.strip(),
         )
 

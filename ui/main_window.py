@@ -560,20 +560,14 @@ class MainWindow(ctk.CTk):
             row.pack(side="top", fill="x", pady=(1, 0))
         row.pack_propagate(False)
 
-        # 时间 + 标题 + 优先级
+        # 时间 + 标题
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
         if not event.is_all_day and event.end_time and event.end_time != event.start_time:
             duration_min = event.duration_minutes
             if duration_min > 0:
                 time_str += f"-{event.end_time.strftime('%H:%M')}"
 
-        priority_marker = ""
-        if event.priority >= 2:
-            priority_marker = " ❗"
-        elif event.priority == 1:
-            priority_marker = " ★"
-
-        title_text = f"{time_str}  {event.title}{priority_marker}"
+        title_text = f"{time_str}  {event.title}"
         ctk.CTkLabel(
             row,
             text=title_text,
@@ -581,6 +575,24 @@ class MainWindow(ctk.CTk):
             anchor="w",
             height=16,
         ).pack(side="left", padx=(8, 0), fill="y")
+
+        # 优先级标记（独立带颜色标签）
+        if event.priority >= 2:
+            ctk.CTkLabel(
+                row,
+                text=" ❗",
+                font=ctk.CTkFont(size=13),
+                text_color="#e74c3c",
+                height=16,
+            ).pack(side="left", fill="y")
+        elif event.priority == 1:
+            ctk.CTkLabel(
+                row,
+                text=" ★",
+                font=ctk.CTkFont(size=13),
+                text_color="#e67e22",
+                height=16,
+            ).pack(side="left", fill="y")
 
         # 分类标签（同行右侧）
         if event.category:
@@ -1450,7 +1462,7 @@ class MainWindow(ctk.CTk):
         """更新语音面板状态，同步录音标记"""
         if state == VoiceState.RECORDING:
             self._is_recording = True
-        elif state in (VoiceState.IDLE, VoiceState.SUCCESS, VoiceState.ERROR):
+        elif state in (VoiceState.IDLE, VoiceState.PROCESSING, VoiceState.SUCCESS, VoiceState.ERROR):
             self._is_recording = False
         self._voice_panel.set_state(state, message)
 
@@ -1472,11 +1484,15 @@ class MainWindow(ctk.CTk):
         # 延迟高亮目标卡片（等待卡片渲染完成）
         if highlight_event_id is not None:
             self.after(30, lambda: self._flash_card(highlight_event_id))
+        # 强制立即绘制（解决窗口未获焦时不重绘的问题）
+        self.update_idletasks()
 
     def refresh_all(self):
         """刷新所有视图"""
         self._refresh_calendar()
         self._refresh_event_list()
+        # 强制立即绘制（解决窗口未获焦时不重绘的问题）
+        self.update_idletasks()
 
     def show_query_window(self, title: str, events: list):
         """打开或复用查询结果窗口（贴主窗口左侧）"""
