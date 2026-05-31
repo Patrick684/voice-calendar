@@ -18,7 +18,7 @@ class SQLiteStorage:
     """
 
     # 数据库表结构版本（用于未来迁移）
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
 
     def __init__(self, db_path: str):
         """
@@ -95,6 +95,10 @@ class SQLiteStorage:
             self._migrate_v3_to_v4(conn)
             logger.info("Schema 迁移完成: v3 -> v4 (+deleted_at)")
 
+        if current_version < 5:
+            self._migrate_v4_to_v5(conn)
+            logger.info("Schema 迁移完成: v4 -> v5 (+recurrence_parent_id)")
+
         # 更新版本号
         conn.execute(
             "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
@@ -127,6 +131,14 @@ class SQLiteStorage:
         except sqlite3.OperationalError:
             pass  # 列已存在
 
+    @staticmethod
+    def _migrate_v4_to_v5(conn: sqlite3.Connection):
+        """v4 → v5: 新增 recurrence_parent_id 列（循环事件实例化）"""
+        try:
+            conn.execute("ALTER TABLE events ADD COLUMN recurrence_parent_id INTEGER")
+        except sqlite3.OperationalError:
+            pass  # 列已存在
+
     def insert_event(self, event: CalendarEvent) -> int:
         """插入新事件
 
@@ -147,8 +159,8 @@ class SQLiteStorage:
                    (title, start_time, end_time, description, is_all_day,
                     reminder_minutes, priority, category,
                     recurrence_rule, recurrence_end, tags,
-                    created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    recurrence_parent_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     data["title"],
                     data["start_time"],
@@ -161,6 +173,7 @@ class SQLiteStorage:
                     data.get("recurrence_rule", ""),
                     data.get("recurrence_end"),
                     data.get("tags", ""),
+                    data.get("recurrence_parent_id"),
                     data.get("created_at"),
                     data.get("updated_at"),
                 ),
@@ -426,6 +439,42 @@ class SQLiteStorage:
                    ORDER BY start_time ASC"""
             )
             return [CalendarEvent.from_row(dict(row)) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def get_children_count(self, parent_id: int) -> int:
+        """获取循环事件的已生成子实例数量"""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                """SELECT COUNT(*) FROM events
+                   WHERE recurrence_parent_id = ?
+                     AND deleted_at IS NULL""",
+                (parent_id,),
+            )
+            return cursor.fetchone()[0]
+        finally:
+            conn.close()
+
+    def get_last_child_time(self, parent_id: int):
+        """获取循环事件已生成子实例中最晚的 start_time"""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                """SELECT MAX(start_time) FROM events
+                   WHERE recurrence_parent_id = ?
+                     AND deleted_at IS NULL""",
+                (parent_id,),
+            )
+            row = cursor.fetchone()
+            if row and row[0]:
+                from datetime import datetime as dt
+
+                try:
+                    return dt.fromisoformat(row[0])
+                except (ValueError, TypeError):
+                    return None
+            return None
         finally:
             conn.close()
 

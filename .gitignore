@@ -8,6 +8,8 @@ dist/
 
 # Build artifacts (keep build/*.spec and build/*.iss)
 build/pyinstaller_work/
+build/pyinstaller_temp/
+build/voice_calendar/
 
 # Virtual environments
 venv/

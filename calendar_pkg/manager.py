@@ -21,6 +21,9 @@ class CalendarManager:
     并对上层（语音指令解析、UI）暴露简洁的接口。
     """
 
+    # 循环事件最大实例数（约一个月）
+    MAX_RECURRING_INSTANCES = 31
+
     def __init__(self, db_path: str, default_reminder_minutes: int = 15):
         """
         初始化日历管理器
@@ -98,6 +101,11 @@ class CalendarManager:
         event_id = self._storage.insert_event(event)
         event.id = event_id
         logger.info(f"事件已添加: {event}")
+
+        # 循环事件：自动创建真实实例（最多 MAX_RECURRING_INSTANCES 条）
+        if recurrence_rule:
+            self._generate_recurring_instances(event)
+
         return event
 
     def delete_event(self, event_id: int) -> Optional[str]:
@@ -157,16 +165,8 @@ class CalendarManager:
         return self.get_events_by_range(start, end)
 
     def get_events_by_range(self, start: datetime, end: datetime) -> List[CalendarEvent]:
-        """查询时间范围内的事件（含循环事件展开）"""
-        # 普通事件
+        """查询时间范围内的事件（循环事件已实例化，无需虚拟展开）"""
         events = self._storage.get_events_by_range(start, end)
-
-        # 循环事件展开
-        recurring = self._storage.get_recurring_events()
-        for rec_event in recurring:
-            instances = self._expand_recurring(rec_event, start, end)
-            events.extend(instances)
-
         # 按开始时间排序
         events.sort(key=lambda e: e.start_time)
         return events
@@ -201,12 +201,91 @@ class CalendarManager:
         return self._storage.get_event_count()
 
     # ================================================================
-    # 循环事件展开
+    # 循环事件实例化
     # ================================================================
+
+    def _generate_recurring_instances(self, parent: CalendarEvent, max_count: int = None):
+        """为循环事件生成真实子事件实例
+
+        Args:
+            parent: 循环事件模板（含 recurrence_rule）
+            max_count: 最大生成数（含 parent 本身），默认 MAX_RECURRING_INSTANCES
+        """
+        if not parent.recurrence_rule or parent.id is None:
+            return
+
+        if max_count is None:
+            max_count = self.MAX_RECURRING_INSTANCES
+
+        try:
+            # 构建 RRULE
+            rrule_string = f"DTSTART:{parent.start_time.strftime('%Y%m%dT%H%M%S')}\nRRULE:{parent.recurrence_rule}"
+            if parent.recurrence_end:
+                rrule_string += f";UNTIL={parent.recurrence_end.strftime('%Y%m%dT%H%M%S')}"
+
+            rule = rrulestr(rrule_string)
+            duration = timedelta(minutes=parent.duration_minutes) if parent.duration_minutes else timedelta(0)
+
+            # 已有实例数（含 parent 本身算 1）
+            existing = self._storage.get_children_count(parent.id)
+            remaining = max_count - 1 - existing  # -1 因为 parent 本身算一条
+
+            if remaining <= 0:
+                return
+
+            # 找到已生成的最新时间，从其之后继续生成
+            last_time = self._storage.get_last_child_time(parent.id)
+            search_start = last_time if last_time else parent.start_time
+
+            # 生成新实例
+            count = 0
+            for dt in rule:
+                if dt <= search_start:
+                    continue
+                if dt == parent.start_time:
+                    continue
+
+                child = CalendarEvent(
+                    title=parent.title,
+                    start_time=dt,
+                    end_time=dt + duration if duration else None,
+                    description=parent.description,
+                    is_all_day=parent.is_all_day,
+                    reminder_minutes=parent.reminder_minutes,
+                    priority=parent.priority,
+                    category=parent.category,
+                    tags=list(parent.tags),
+                    recurrence_parent_id=parent.id,
+                )
+                child_id = self._storage.insert_event(child)
+                child.id = child_id
+                count += 1
+                if count >= remaining:
+                    break
+
+            if count > 0:
+                logger.info(f"循环事件实例化: '{parent.title}' 新增 {count} 条实例")
+
+        except (ValueError, TypeError) as e:
+            logger.warning(f"循环事件实例化失败: {parent.title}, error={e}")
+
+    def expand_recurring_events(self):
+        """启动时检查并补充循环事件实例
+
+        确保每个循环事件都有足够的未来实例（最多 MAX_RECURRING_INSTANCES 条）。
+        应在应用启动时调用。
+        """
+        recurring = self._storage.get_recurring_events()
+        if not recurring:
+            return
+
+        logger.info(f"检查循环事件实例化: {len(recurring)} 个循环模板")
+        for parent in recurring:
+            self._generate_recurring_instances(parent)
 
     @staticmethod
     def _expand_recurring(event: CalendarEvent, range_start: datetime, range_end: datetime) -> List[CalendarEvent]:
-        """将循环事件展开为指定范围内的具体实例
+        """将循环事件展开为指定范围内的具体实例（保留兼容，但不再在查询中使用）
 
         Args:
             event: 循环事件

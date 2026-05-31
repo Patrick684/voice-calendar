@@ -559,7 +559,13 @@ class CommandParser:
         """判断是否为简单单指令（无需 LLM）
 
         条件：无连接词、时间锚点不多于2个、文本较短
+        特殊：含修改/删除关键词时始终视为单指令（这类指令天然包含源+目标双时间）
         """
+        # 含修改/删除关键词 → 天然包含多个时间锚点（源时间+目标时间），视为单指令
+        if self._rule_engine._update_pattern.search(text):
+            return True
+        if self._rule_engine._delete_pattern.search(text):
+            return True
         # 有连接词 → 可能多指令
         if self._SPLIT_DELIMITERS.search(text):
             return False

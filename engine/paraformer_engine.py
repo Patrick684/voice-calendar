@@ -115,15 +115,15 @@ class ParaformerEngine:
             }
 
             # 优先使用打包内置的模型路径
-            bundled_model = get_app_dir() / "models" / "paraformer-zh"
-            if bundled_model.exists():
+            bundled_model = self._find_model_dir(get_app_dir() / "models" / "paraformer-zh")
+            if bundled_model:
                 model_kwargs["model"] = str(bundled_model)
 
-            bundled_vad = get_app_dir() / "models" / "fsmn-vad"
+            bundled_vad = self._find_model_dir(get_app_dir() / "models" / "fsmn-vad")
 
             # 添加 VAD 模型（用于长音频端点检测）
             if self.vad_model:
-                if bundled_vad.exists():
+                if bundled_vad:
                     model_kwargs["vad_model"] = str(bundled_vad)
                 else:
                     model_kwargs["vad_model"] = self.vad_model
@@ -160,10 +160,10 @@ class ParaformerEngine:
                         "disable_update": True,
                     }
                     # CPU 回退也优先使用内置模型路径
-                    if bundled_model.exists():
+                    if bundled_model:
                         model_kwargs["model"] = str(bundled_model)
                     if self.vad_model:
-                        if bundled_vad.exists():
+                        if bundled_vad:
                             model_kwargs["vad_model"] = str(bundled_vad)
                         else:
                             model_kwargs["vad_model"] = self.vad_model
@@ -288,6 +288,36 @@ class ParaformerEngine:
 
         thread = threading.Thread(target=_worker, daemon=True, name="ParaformerWorker")
         thread.start()
+
+    @staticmethod
+    def _find_model_dir(base_path):
+        """查找有效的模型目录（含 configuration.json）
+
+        FunASR 依赖 configuration.json 来识别模型类型。
+        ModelScope 下载的模型可能嵌套在子目录中。
+
+        Args:
+            base_path: 模型基础路径
+
+        Returns:
+            有效模型目录的 Path，未找到返回 None
+        """
+        from pathlib import Path
+
+        base_path = Path(base_path)
+        if not base_path.exists():
+            return None
+
+        # 根目录直接有 configuration.json
+        if (base_path / "configuration.json").exists():
+            return base_path
+
+        # 在子目录中查找（ModelScope 缓存结构）
+        for subdir in base_path.iterdir():
+            if subdir.is_dir() and (subdir / "configuration.json").exists():
+                return subdir
+
+        return None
 
     @staticmethod
     def _normalize_audio(audio: np.ndarray, target_peak: float = 0.8, max_gain: float = 10.0) -> np.ndarray:
