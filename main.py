@@ -83,6 +83,9 @@ class VoiceCalendarApp:
         """初始化所有子模块"""
         logger.info("正在初始化各模块...")
 
+        # 检查是否有手动放置的 CUDA addon 待安装
+        self._check_pending_cuda_addon()
+
         # 日历管理器
         self._calendar = CalendarManager(
             db_path=self.config.calendar_db_path,
@@ -91,12 +94,13 @@ class VoiceCalendarApp:
 
         # 语音识别引擎（根据配置选择 Paraformer 或 Whisper）
         asr_engine = self.config.get("asr_engine", "paraformer")
+        asr_device = self.config.get("asr_device", "cuda:0")
         if asr_engine == "paraformer":
             self._asr = ParaformerEngine(
-                device="cuda:0",
+                device=asr_device,
                 cache_dir=str(self.config.model_cache_dir),
             )
-            logger.info("ASR 引擎: Paraformer (GPU)")
+            logger.info(f"ASR 引擎: Paraformer (device={self._asr.device})")
         else:
             self._asr = WhisperEngine(
                 model_size=self.config.get("model_size", "small"),
@@ -162,6 +166,23 @@ class VoiceCalendarApp:
         )
 
         logger.info("模块初始化完成")
+
+    def _check_pending_cuda_addon(self):
+        """检查是否有手动放置的 CUDA addon zip 待安装"""
+        try:
+            from utils.torch_manager import check_manual_addon, install_cuda_addon
+
+            zip_path = check_manual_addon()
+            if zip_path:
+                logger.info(f"检测到待安装的 CUDA addon: {zip_path}")
+                success = install_cuda_addon(zip_path)
+                if success:
+                    self.config.set("asr_device", "cuda:0")
+                    logger.info("CUDA addon 自动安装完成")
+                else:
+                    logger.warning("CUDA addon 自动安装失败")
+        except Exception as e:
+            logger.debug(f"CUDA addon 检查跳过: {e}")
 
     def run(self):
         """启动应用"""
