@@ -94,6 +94,9 @@ class MainWindow(ctk.CTk):
         # 查询结果窗口引用
         self._query_window: Optional[QueryWindow] = None
 
+        # 单击延迟定时器（用于区分单击/双击）
+        self._click_open_timer = None
+
         # 分类颜色（从配置获取，使用默认值）
         self._category_colors: Dict[str, str] = {
             "工作": "#2196F3",
@@ -443,72 +446,60 @@ class MainWindow(ctk.CTk):
                 self._create_event_card(event)
 
     def _create_event_card(self, event: CalendarEvent):
-        """创建事件卡片（含分类颜色条 + 左键拖拽）"""
-        card = ctk.CTkFrame(self._event_scroll, corner_radius=8)
-        card.pack(fill="x", pady=3)
+        """创建事件卡片（紧凑布局 + 描述自适应高度）"""
+        card = ctk.CTkFrame(self._event_scroll, corner_radius=6)
+        card.pack(fill="x", pady=2)
 
         # 分类颜色条
         cat_color = self._category_colors.get(event.category, "#757575")
-        color_bar = ctk.CTkFrame(card, width=4, fg_color=cat_color, corner_radius=2)
-        color_bar.pack(side="left", fill="y", padx=(5, 0), pady=3)
+        ctk.CTkFrame(card, width=4, fg_color=cat_color, corner_radius=2).pack(
+            side="left", fill="y", padx=(4, 0), pady=3
+        )
 
         # 内容区
         content = ctk.CTkFrame(card, fg_color="transparent")
         content.pack(side="left", fill="both", expand=True)
 
+        # 第一行：时间 + 标题 + 优先级
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
-        # 持续事件显示时间范围（如 "14:00-17:00 (3h)"）
-        duration_tag = ""
         if not event.is_all_day and event.end_time and event.end_time != event.start_time:
             duration_min = event.duration_minutes
             if duration_min > 0:
                 time_str += f"-{event.end_time.strftime('%H:%M')}"
-                if duration_min >= 60:
-                    h = int(duration_min // 60)
-                    m = int(duration_min % 60)
-                    duration_tag = f" ({h}h{m}min)" if m else f" ({h}h)"
-                else:
-                    duration_tag = f" ({int(duration_min)}min)"
-        title_text = f"{time_str}{duration_tag}  {event.title}"
 
-        # 优先级标记
         priority_marker = ""
         if event.priority >= 2:
             priority_marker = " ❗"
         elif event.priority == 1:
             priority_marker = " ★"
 
+        title_text = f"{time_str}  {event.title}{priority_marker}"
         ctk.CTkLabel(
             content,
-            text=title_text + priority_marker,
-            font=ctk.CTkFont(size=13),
+            text=title_text,
+            font=ctk.CTkFont(size=12),
             anchor="w",
-        ).pack(fill="x", padx=10, pady=(8, 2))
+        ).pack(fill="x", padx=8, pady=(4, 1))
 
+        # 描述行（有描述时显示，高度随文本自适应）
         if event.description:
             ctk.CTkLabel(
                 content,
                 text=event.description,
-                font=ctk.CTkFont(size=11),
-                text_color="gray",
+                font=ctk.CTkFont(size=10),
+                text_color="#888888",
                 anchor="w",
-                wraplength=250,
-            ).pack(fill="x", padx=10, pady=(0, 5))
+                wraplength=240,
+            ).pack(fill="x", padx=8, pady=(0, 3))
 
-        # 分类 + 标签行
-        info_parts = []
+        # 分类标签（右侧）
         if event.category:
-            info_parts.append(f"[{event.category}]")
-        if event.tags:
-            info_parts.extend(f"[{t}]" for t in event.tags)
-        if info_parts:
             ctk.CTkLabel(
-                content,
-                text="  ".join(info_parts),
+                card,
+                text=event.category,
                 font=ctk.CTkFont(size=10),
                 text_color=cat_color,
-                anchor="w",
-            ).pack(fill="x", padx=10, pady=(0, 5))
+            ).pack(side="right", padx=(0, 8), pady=3)
 
         # 右键菜单（快捷编辑）
         if event.id is not None:
@@ -518,13 +509,16 @@ class MainWindow(ctk.CTk):
                 for grandchild in child.winfo_children():
                     self._bind_context_menu(grandchild, event)
 
-        # 左键拖拽（仅真实事件，移动阈值区分点击/拖拽）
+        # 左键拖拽 + 双击描述（仅真实事件）
         if event.id is not None:
             self._bind_drag_events(card, event)
+            self._bind_double_click(card, event)
             for child in card.winfo_children():
                 self._bind_drag_events(child, event)
+                self._bind_double_click(child, event)
                 for grandchild in child.winfo_children():
                     self._bind_drag_events(grandchild, event)
+                    self._bind_double_click(grandchild, event)
         else:
             # 虚拟循环实例只能点击编辑
             card.bind("<Button-1>", lambda e, ev=event: self._open_event_dialog(ev))
@@ -536,6 +530,33 @@ class MainWindow(ctk.CTk):
     def _bind_drag_events(self, widget, event: CalendarEvent):
         """绑定左键拖拽事件（带移动阈值）"""
         widget.bind("<ButtonPress-1>", lambda e, ev=event: self._on_press(e, ev))
+
+    def _bind_double_click(self, widget, event: CalendarEvent):
+        """绑定双击事件（添加/编辑描述）"""
+        widget.bind("<Double-Button-1>", lambda e, ev=event: self._on_double_click_desc(ev))
+
+    def _on_double_click_desc(self, cal_event: CalendarEvent):
+        """双击卡片 — 弹出描述输入框"""
+        # 取消单击延迟开编辑对话框
+        if hasattr(self, "_click_open_timer") and self._click_open_timer:
+            self.after_cancel(self._click_open_timer)
+            self._click_open_timer = None
+
+        dialog = ctk.CTkInputDialog(
+            text=f"为「{cal_event.title}」添加描述：",
+            title="编辑描述",
+        )
+        # 预填充已有描述
+        if cal_event.description:
+            dialog._entry.insert(0, cal_event.description)
+
+        result = dialog.get_input()
+        if result is not None:
+            # 空字符串表示清空描述
+            desc = result.strip() if result.strip() else None
+            self._manager.update_event(cal_event.id, description=desc)
+            logger.info(f"描述更新: {cal_event.title} → {desc}")
+            self._refresh_event_list()
 
     def _bind_context_menu(self, widget, event: CalendarEvent):
         """绑定右键菜单"""
@@ -745,7 +766,7 @@ class MainWindow(ctk.CTk):
                 "long_press_id": None,
             }
         else:
-            # 点击模式（非拖拽、非长按）- 打开编辑对话框
+            # 点击模式（非拖拽、非长按）- 延迟打开编辑对话框（给双击时间取消）
             self._drag_data = {
                 "event": None,
                 "source_date": None,
@@ -754,7 +775,7 @@ class MainWindow(ctk.CTk):
                 "dragging": False,
                 "long_press_id": None,
             }
-            self._open_event_dialog(cal_event)
+            self._click_open_timer = self.after(300, lambda ev=cal_event: self._open_event_dialog(ev))
 
     def _create_drag_ghost(self, cal_event: CalendarEvent, x: int, y: int):
         """创建跟随鼠标的浮动幽灵卡片"""
