@@ -34,6 +34,7 @@ class VoicePanel(ctk.CTkFrame):
         self,
         master,
         on_voice_button: Optional[Callable] = None,
+        on_recycle_bin: Optional[Callable] = None,
         **kwargs,
     ):
         """
@@ -42,9 +43,11 @@ class VoicePanel(ctk.CTkFrame):
         Args:
             master: 父组件
             on_voice_button: 语音按钮点击回调
+            on_recycle_bin: 回收站按钮点击回调
         """
         super().__init__(master, height=80, **kwargs)
         self._on_voice_button = on_voice_button
+        self._on_recycle_bin = on_recycle_bin
         self._state = VoiceState.IDLE
         self._setup_ui()
 
@@ -88,6 +91,20 @@ class VoicePanel(ctk.CTkFrame):
             wraplength=500,
         )
         self._result_label.grid(row=1, column=0, sticky="w", pady=(2, 0))
+
+        # 右下角：回收站按钮
+        self._recycle_btn = ctk.CTkButton(
+            self,
+            text="🗑 回收站",
+            width=80,
+            height=28,
+            font=ctk.CTkFont(size=11),
+            fg_color="transparent",
+            text_color="gray",
+            hover_color=("#e0e0e0", "#3a3a3a"),
+            command=self._on_recycle_click,
+        )
+        self._recycle_btn.grid(row=0, column=2, padx=(0, 10), pady=10, sticky="se")
 
     def set_state(self, state: VoiceState, message: str = ""):
         """更新面板状态
@@ -133,3 +150,8 @@ class VoicePanel(ctk.CTkFrame):
         """语音按钮点击"""
         if self._on_voice_button:
             self._on_voice_button()
+
+    def _on_recycle_click(self):
+        """回收站按钮点击"""
+        if self._on_recycle_bin:
+            self._on_recycle_bin()

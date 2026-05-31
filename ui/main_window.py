@@ -17,6 +17,7 @@ from ui.event_dialog import EventDialog
 from ui.stats_view import StatsView
 from ui.time_wheel import TimeWheel
 from ui.query_window import QueryWindow
+from ui.recycle_bin_window import RecycleBinWindow
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,9 @@ class MainWindow(ctk.CTk):
         # 查询结果窗口引用
         self._query_window: Optional[QueryWindow] = None
 
+        # 回收站窗口引用
+        self._recycle_bin_window: Optional[RecycleBinWindow] = None
+
         # 单击延迟定时器（用于区分单击/双击）
         self._click_open_timer = None
 
@@ -147,7 +151,9 @@ class MainWindow(ctk.CTk):
         self._setup_event_list()
 
         # 底部：语音面板
-        self._voice_panel = VoicePanel(self, on_voice_button=self._on_voice_click)
+        self._voice_panel = VoicePanel(
+            self, on_voice_button=self._on_voice_click, on_recycle_bin=self._open_recycle_bin
+        )
         self._voice_panel.pack(fill="x", padx=10, pady=(5, 10))
 
     def _setup_toolbar(self):
@@ -1418,6 +1424,41 @@ class MainWindow(ctk.CTk):
         if x < 0:
             x = 0
         self._query_window.geometry(f"280x{h}+{x}+{y}")
+
+    # ================================================================
+    # 回收站
+    # ================================================================
+
+    def _open_recycle_bin(self):
+        """打开回收站窗口"""
+        events = self._manager.get_deleted_events()
+        if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
+            self._recycle_bin_window.refresh(events)
+            self._recycle_bin_window.focus()
+        else:
+            self._recycle_bin_window = RecycleBinWindow(
+                self,
+                events,
+                on_restore=self._on_restore_event,
+                on_hard_delete=self._on_hard_delete_event,
+            )
+
+    def _on_restore_event(self, event_id: int):
+        """恢复已删除事件"""
+        self._manager.restore_event(event_id)
+        logger.info(f"回收站恢复事件: id={event_id}")
+        # 刷新回收站和主界面
+        if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
+            self._recycle_bin_window.refresh(self._manager.get_deleted_events())
+        self._refresh_calendar()
+        self._refresh_event_list()
+
+    def _on_hard_delete_event(self, event_id: int):
+        """彻底删除事件"""
+        self._manager.hard_delete_event(event_id)
+        logger.info(f"回收站彻底删除: id={event_id}")
+        if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
+            self._recycle_bin_window.refresh(self._manager.get_deleted_events())
 
     def show_reminder(self, event: CalendarEvent):
         """显示事件提醒弹窗"""
