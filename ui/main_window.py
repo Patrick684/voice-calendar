@@ -365,15 +365,23 @@ class MainWindow(ctk.CTk):
         (0, "○ 普通", "#95a5a6"),
     ]
 
-    def _setup_event_list_for_date(self, date_str: str):
+    def _setup_event_list_for_date(self, date_str: str, keep_scroll: bool = False):
         """刷新指定日期的事件列表（支持排序模式）"""
+        # 记录当前滚动位置
+        scroll_pos = 0.0
+        if keep_scroll:
+            try:
+                scroll_pos = self._event_scroll._parent_canvas.yview()[0]
+            except Exception:
+                pass
+
         # 清空旧内容
         for widget in self._event_scroll.winfo_children():
             widget.destroy()
 
-        # 重置滚动位置到顶部
+        # 恢复滚动位置（或重置到顶部）
         try:
-            self._event_scroll._parent_canvas.yview_moveto(0)
+            self._event_scroll._parent_canvas.yview_moveto(scroll_pos if keep_scroll else 0)
         except Exception:
             pass
 
@@ -461,17 +469,11 @@ class MainWindow(ctk.CTk):
             side="left", fill="y", padx=(3, 0), pady=2
         )
 
-        # 分类标签（右侧）
-        if event.category:
-            ctk.CTkLabel(
-                card,
-                text=event.category,
-                font=ctk.CTkFont(size=12),
-                text_color=cat_color,
-            ).pack(side="right", padx=(0, 8), pady=2)
+        # 第一行容器（标题 + 分类在同一行）
+        row = ctk.CTkFrame(card, fg_color="transparent")
+        row.pack(side="top", fill="x", pady=(3, 0))
 
-        # 内容区（无额外 frame 包装，直接放卡片内）
-        # 第一行：时间 + 标题 + 优先级
+        # 时间 + 标题 + 优先级
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
         if not event.is_all_day and event.end_time and event.end_time != event.start_time:
             duration_min = event.duration_minutes
@@ -486,11 +488,20 @@ class MainWindow(ctk.CTk):
 
         title_text = f"{time_str}  {event.title}{priority_marker}"
         ctk.CTkLabel(
-            card,
+            row,
             text=title_text,
             font=ctk.CTkFont(size=14),
             anchor="w",
-        ).pack(side="top", fill="x", padx=(10, 0), pady=(3, 0))
+        ).pack(side="left", padx=(8, 0))
+
+        # 分类标签（同行右侧）
+        if event.category:
+            ctk.CTkLabel(
+                row,
+                text=event.category,
+                font=ctk.CTkFont(size=12),
+                text_color=cat_color,
+            ).pack(side="right", padx=(0, 8))
 
         # 描述行（有描述时显示，卡片高度自动扩展）
         if event.description:
@@ -501,7 +512,7 @@ class MainWindow(ctk.CTk):
                 text_color="#888888",
                 anchor="w",
                 wraplength=240,
-            ).pack(side="top", fill="x", padx=(10, 0), pady=(0, 3))
+            ).pack(side="top", fill="x", padx=(14, 0), pady=(0, 3))
 
         # 右键菜单（快捷编辑）
         if event.id is not None:
@@ -558,7 +569,7 @@ class MainWindow(ctk.CTk):
             desc = result.strip() if result.strip() else None
             self._manager.update_event(cal_event.id, description=desc)
             logger.info(f"描述更新: {cal_event.title} → {desc}")
-            self._refresh_event_list()
+            self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"), keep_scroll=True)
 
     def _bind_context_menu(self, widget, event: CalendarEvent):
         """绑定右键菜单"""
@@ -610,7 +621,7 @@ class MainWindow(ctk.CTk):
             return
         self._manager.update_event(cal_event.id, priority=priority)
         logger.info(f"快捷设置优先级: {cal_event.title} → {priority}")
-        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"))
+        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"), keep_scroll=True)
 
     def _quick_set_category(self, cal_event: CalendarEvent, category: str):
         """快捷设置分类"""
@@ -618,7 +629,7 @@ class MainWindow(ctk.CTk):
             return
         self._manager.update_event(cal_event.id, category=category)
         logger.info(f"快捷设置分类: {cal_event.title} → {category}")
-        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"))
+        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"), keep_scroll=True)
 
     def _quick_delete(self, cal_event: CalendarEvent):
         """快捷删除事件"""
@@ -626,7 +637,7 @@ class MainWindow(ctk.CTk):
             return
         self._manager.delete_event(cal_event.id)
         logger.info(f"快捷删除: {cal_event.title}")
-        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"))
+        self._setup_event_list_for_date(cal_event.start_time.strftime("%Y-%m-%d"), keep_scroll=True)
         self._refresh_calendar()
 
     # ================================================================
