@@ -1544,12 +1544,24 @@ class MainWindow(ctk.CTk):
         if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
             self._recycle_bin_window.refresh([])
 
+    # ================================================================
+    # 提醒弹窗 - 屏幕右下角滑入动画
+    # ================================================================
+
+    _REMINDER_ANIM_STEPS = 12  # 动画帧数
+    _REMINDER_ANIM_INTERVAL = 25  # 每帧毫秒
+    _REMINDER_AUTO_DISMISS = 8000  # 自动消失时间（毫秒）
+
     def show_reminder(self, event: CalendarEvent):
-        """显示事件提醒弹窗"""
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("事件提醒")
-        dialog.geometry("350x180")
+        """显示事件提醒弹窗 - 从屏幕右下角滑入"""
+        import tkinter as tk
+
+        # 使用原生 tk.Toplevel 避免 CTkToplevel 的 DPI 缩放和延迟初始化问题
+        dialog = tk.Toplevel(self)
+        dialog.title("")
+        dialog.overrideredirect(True)
         dialog.attributes("-topmost", True)
+        dialog.configure(bg="#ffffff")
 
         # 计算剩余时间
         from datetime import datetime as dt
@@ -1564,27 +1576,160 @@ class MainWindow(ctk.CTk):
 
         time_str = event.start_time.strftime("%m月%d日 %H:%M")
 
+        # 构建内容
+        content = ctk.CTkFrame(dialog, fg_color="#ffffff", corner_radius=12)
+        content.pack(fill="both", expand=True, padx=1, pady=1)
+
+        # 顶部栏：标题 + 分类 + 关闭按钮
+        top_bar = ctk.CTkFrame(content, fg_color="transparent", height=36)
+        top_bar.pack(fill="x", padx=16, pady=(14, 0))
+        top_bar.pack_propagate(False)
+
         ctk.CTkLabel(
-            dialog,
-            text=f"\u23f0 提醒: {event.title}",
+            top_bar,
+            text=f"\u23f0 {event.title}",
             font=ctk.CTkFont(size=16, weight="bold"),
-        ).pack(pady=(15, 5))
-        ctk.CTkLabel(
-            dialog,
-            text=f"时间: {time_str}  ({time_hint})",
-            font=ctk.CTkFont(size=13),
-        ).pack()
+            text_color="#1a1a1a",
+            anchor="w",
+        ).pack(side="left")
+
+        # 分类标签（同一行，带颜色）
         if event.category:
             cat_color = self._category_colors.get(event.category, "#757575")
             ctk.CTkLabel(
-                dialog,
-                text=f"分类: {event.category}",
-                font=ctk.CTkFont(size=12),
+                top_bar,
+                text=f" [{event.category}]",
+                font=ctk.CTkFont(size=15, weight="bold"),
                 text_color=cat_color,
-            ).pack(pady=(3, 0))
+                anchor="w",
+            ).pack(side="left")
+
         ctk.CTkButton(
-            dialog,
+            top_bar,
+            text="\u2715",
+            width=28,
+            height=28,
+            font=ctk.CTkFont(size=15),
+            fg_color="transparent",
+            hover_color="#e0e0e0",
+            text_color="#666666",
+            corner_radius=4,
+            command=lambda: self._dismiss_reminder(dialog),
+        ).pack(side="right")
+
+        # 信息行
+        info_text = f"{time_str}  ({time_hint})"
+        ctk.CTkLabel(
+            content,
+            text=info_text,
+            font=ctk.CTkFont(size=14),
+            text_color="#555555",
+            anchor="w",
+        ).pack(padx=18, pady=(8, 14), anchor="w")
+
+        # 底部按钮
+        btn_frame = ctk.CTkFrame(content, fg_color="transparent")
+        btn_frame.pack(padx=18, pady=(0, 16), fill="x")
+
+        ctk.CTkButton(
+            btn_frame,
             text="知道了",
-            width=80,
-            command=dialog.destroy,
-        ).pack(pady=12)
+            width=88,
+            height=34,
+            font=ctk.CTkFont(size=14),
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
+            text_color="#ffffff",
+            corner_radius=6,
+            command=lambda: self._dismiss_reminder(dialog),
+        ).pack(side="right")
+
+        # 定位到屏幕右下角
+        # geometry() 实际使用物理像素坐标，直接用物理分辨率计算
+        import ctypes
+
+        dialog.update_idletasks()
+        actual_w = dialog.winfo_reqwidth()
+        actual_h = dialog.winfo_reqheight()
+
+        # 物理屏幕尺寸
+        phys_w = ctypes.windll.user32.GetSystemMetrics(0)  # 1920
+        phys_h = ctypes.windll.user32.GetSystemMetrics(1)  # 1080
+
+        # 物理像素下的任务栏和边距
+        dpi = ctypes.windll.user32.GetDpiForSystem()
+        scale = dpi / 96.0
+        taskbar_h = int(48 * scale)  # 48 逻辑 -> 60 物理
+        margin = int(12 * scale)  # 12 逻辑 -> 15 物理
+
+        target_x = phys_w - actual_w - margin
+        target_y = phys_h - actual_h - taskbar_h - margin
+        start_y = phys_h  # 从屏幕底部开始滑入
+
+        logger.info(f"[弹窗定位] phys={phys_w}x{phys_h}, popup={actual_w}x{actual_h}, target=({target_x},{target_y})")
+
+        dialog.geometry(f"{actual_w}x{actual_h}+{target_x}+{start_y}")
+        dialog.update_idletasks()
+
+        self._animate_reminder_slide(dialog, target_x, start_y, target_y, actual_w, actual_h, step=0, direction="up")
+
+        # 自动消失定时器
+        dialog._auto_dismiss_id = dialog.after(
+            self._REMINDER_AUTO_DISMISS,
+            lambda: self._dismiss_reminder(dialog),
+        )
+
+    def _animate_reminder_slide(self, dialog, x, current_y, target_y, w, h, step, direction):
+        """提醒弹窗滑动动画"""
+        try:
+            if not dialog.winfo_exists():
+                return
+        except Exception:
+            return
+
+        total = self._REMINDER_ANIM_STEPS
+        if step >= total:
+            if direction == "down":
+                try:
+                    dialog.destroy()
+                except Exception:
+                    pass
+            return
+
+        # 缓动函数 (ease-out)
+        t = step / total
+        ease = 1 - (1 - t) ** 3
+
+        new_y = int(current_y + (target_y - current_y) * ease)
+
+        try:
+            dialog.geometry(f"{w}x{h}+{x}+{new_y}")
+        except Exception:
+            return
+
+        dialog.after(
+            self._REMINDER_ANIM_INTERVAL,
+            lambda: self._animate_reminder_slide(dialog, x, current_y, target_y, w, h, step + 1, direction),
+        )
+
+    def _dismiss_reminder(self, dialog):
+        """关闭提醒弹窗 - 向下滑出"""
+        if not dialog.winfo_exists():
+            return
+
+        # 取消自动消失定时器
+        if hasattr(dialog, "_auto_dismiss_id"):
+            dialog.after_cancel(dialog._auto_dismiss_id)
+
+        # 获取当前位置，向下滑出到屏幕底部
+        import ctypes
+
+        phys_h = ctypes.windll.user32.GetSystemMetrics(1)
+
+        current_y = dialog.winfo_y()
+        target_x = dialog.winfo_x()
+        w = dialog.winfo_width()
+        h = dialog.winfo_height()
+        slide_target = phys_h
+
+        self._animate_reminder_slide(dialog, target_x, current_y, slide_target, w, h, step=0, direction="down")

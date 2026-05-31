@@ -31,6 +31,9 @@ from command.completion import CommandCompleter
 from ui.main_window import MainWindow
 from ui.settings_window import SettingsWindow
 from ui.voice_panel import VoiceState
+from ui.tray import SystemTray
+from ui.notification import ToastNotifier
+from sounds.generate_sounds import ensure_sounds
 
 # 应用主题配置
 import customtkinter as ctk
@@ -64,6 +67,14 @@ class VoiceCalendarApp:
 
         # 窗口引用
         self._settings_window: Optional[SettingsWindow] = None
+        self._main_window: Optional[MainWindow] = None
+
+        # 系统托盘与通知
+        self._tray: Optional[SystemTray] = None
+        self._notifier: Optional[ToastNotifier] = None
+
+        # 确保音效文件存在
+        ensure_sounds(self.config.sounds_dir)
 
         # 初始化各模块
         self._init_modules()
@@ -163,9 +174,11 @@ class VoiceCalendarApp:
         # 注册快捷键
         self._hotkey.register()
 
-        # 启动提醒调度器
-        if self.config.get("reminder_enabled", True):
-            self._reminder.start()
+        # 初始化 Toast 通知器
+        self._notifier = ToastNotifier(
+            app_id="语音日历",
+            sounds_dir=self.config.sounds_dir,
+        )
 
         # 创建主窗口
         self._main_window = MainWindow(
@@ -177,6 +190,21 @@ class VoiceCalendarApp:
             achievement_engine=self._achievement_engine,
         )
         self._main_window.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # 启动系统托盘
+        self._tray = SystemTray(
+            on_open=self._on_tray_open,
+            on_quit=self._on_quit,
+        )
+        self._tray.start()
+
+        # 如果配置了启动时最小化，直接隐藏窗口
+        if self.config.get("start_minimized", False):
+            self._main_window.withdraw()
+
+        # 启动提醒调度器（在主窗口创建之后，避免时序问题）
+        if self.config.get("reminder_enabled", True):
+            self._reminder.start()
 
         # 启动结果轮询
         self._poll_results()
@@ -824,19 +852,60 @@ class VoiceCalendarApp:
             self._command_parser.enable_llm(changes["llm_enabled"])
 
     def _on_reminder_triggered(self, event):
-        """提醒触发回调"""
+        """提醒触发回调 - 发送 Toast 通知 + 显示弹窗 + 可选音效"""
         logger.info(f"提醒触发: {event.title}")
-        self._result_queue.put(("reminder", event, None))
+
+        # Toast 通知（始终有效，不依赖主窗口）
+        if self._notifier:
+            self._notifier.show_reminder(event)
+
+        # 音效（如果启用）
+        if self.config.get("reminder_sound", False) and self._notifier:
+            sound = self._reminder.get_sound_for_category(event.category)
+            self._notifier.play_sound(sound)
+
+        # 始终显示自定义弹窗（topmost 独立窗口，不受主窗口可见性影响）
+        try:
+            if self._main_window:
+                self._result_queue.put(("reminder", event, None))
+        except Exception:
+            pass
 
     def _on_close(self):
-        """关闭窗口"""
-        logger.info("应用关闭")
+        """关闭窗口 -> 最小化到托盘或退出"""
+        if self.config.get("minimize_to_tray", True):
+            logger.info("窗口最小化到系统托盘")
+            self._main_window.withdraw()
+        else:
+            self._on_quit()
+
+    def _on_tray_open(self):
+        """从托盘恢复窗口"""
+        if self._main_window:
+            self._main_window.after(0, self._restore_window)
+
+    def _restore_window(self):
+        """在主线程中恢复窗口"""
+        self._main_window.deiconify()
+        self._main_window.lift()
+        self._main_window.focus_force()
+
+    def _on_quit(self):
+        """真正退出应用"""
+        logger.info("应用退出")
         self._hotkey.unregister()
         self._reminder.stop()
         self._recorder.cancel_recording()
         self._stop_event.set()
+        if self._tray:
+            self._tray.stop()
         if self._main_window:
-            self._main_window.destroy()
+            self._main_window.withdraw()  # 立即隐藏窗口
+            self._main_window.quit()  # 停止 mainloop
+        # 直接终止进程，避免 CustomTkinter 的 TclError
+        import os
+
+        os._exit(0)
 
 
 def main():
