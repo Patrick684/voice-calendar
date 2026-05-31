@@ -481,7 +481,11 @@ class MainWindow(ctk.CTk):
 
         # 第一行容器（标题 + 分类在同一行）
         row = ctk.CTkFrame(card, fg_color="transparent", height=18, corner_radius=0)
-        row.pack(side="top", fill="x", pady=(1, 0))
+        if not event.description:
+            # 无描述时 expand=True 使 row 垂直居中于 36px 卡片
+            row.pack(side="top", fill="x", expand=True)
+        else:
+            row.pack(side="top", fill="x", pady=(1, 0))
         row.pack_propagate(False)
 
         # 时间 + 标题 + 优先级
@@ -574,9 +578,7 @@ class MainWindow(ctk.CTk):
         )
         # 预填充已有描述（_entry 是延迟创建的，需等 widget 就绪）
         if cal_event.description:
-            dialog.after(
-                200, lambda: dialog._entry.insert(0, cal_event.description)
-            )
+            dialog.after(200, lambda: dialog._entry.insert(0, cal_event.description))
 
         result = dialog.get_input()
         if result is not None:

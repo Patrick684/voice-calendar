@@ -246,3 +246,5 @@
 {"text": "把看牙改到后天下午四点", "label": "update_event", "expected_title": "看牙", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
 {"text": "把看牙推迟一个小时", "label": "update_event", "expected_title": "看牙小时", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
 {"text": "推迟看牙一个小时", "label": "update_event", "expected_title": "看牙小时", "expected_recurrence": "", "confidence": 0.8, "note": "自动记录", "accepted": true}
+{"text": "查看今天所有事件", "label": "query_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "查看今天所有事件", "label": "query_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
