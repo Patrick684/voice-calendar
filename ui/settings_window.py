@@ -1,10 +1,20 @@
 """设置窗口 - 语音日历工具的配置界面"""
 
 import logging
+import threading
 import customtkinter as ctk
 
 from config import Config
 from utils.autostart import is_autostart_enabled, set_autostart
+from utils.torch_manager import (
+    detect_torch_mode,
+    download_cuda_addon,
+    get_cuda_addon_size,
+    get_manual_download_url,
+    install_cuda_addon,
+    remove_cuda_addon,
+    check_manual_addon,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -154,16 +164,30 @@ class SettingsWindow(ctk.CTkToplevel):
         )
         self._engine_combo.grid(row=0, column=1, sticky="w", **pad)
 
-        # 计算设备（Paraformer 相关）
+        # 计算设备 - 状态显示 + 切换按钮
         ctk.CTkLabel(tab, text="计算设备:").grid(row=1, column=0, sticky="w", **pad)
-        self._device_var = ctk.StringVar()
-        self._device_combo = ctk.CTkComboBox(
-            tab,
-            variable=self._device_var,
-            width=200,
-            values=["GPU (cuda)", "CPU"],
+        self._device_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        self._device_frame.grid(row=1, column=1, sticky="w", **pad)
+
+        self._device_status_label = ctk.CTkLabel(
+            self._device_frame,
+            text="检测中...",
+            font=ctk.CTkFont(size=13, weight="bold"),
         )
-        self._device_combo.grid(row=1, column=1, sticky="w", **pad)
+        self._device_status_label.pack(side="left", padx=(0, 10))
+
+        self._device_switch_btn = ctk.CTkButton(
+            self._device_frame,
+            text="切换",
+            width=180,
+            height=28,
+            font=ctk.CTkFont(size=12),
+            command=self._on_device_switch,
+        )
+        self._device_switch_btn.pack(side="left")
+
+        # 保留隐藏的 device_var 用于保存配置
+        self._device_var = ctk.StringVar()
 
         # Whisper 模型大小（仅 Whisper 引擎显示）
         self._model_size_label = ctk.CTkLabel(tab, text="Whisper 模型:")
@@ -339,9 +363,8 @@ class SettingsWindow(ctk.CTkToplevel):
         engine = c.get("asr_engine", "paraformer")
         engine_display = "Paraformer (推荐)" if engine == "paraformer" else "Whisper"
         self._engine_combo.set(engine_display)
-        device = c.get("asr_device", "cuda:0")
-        device_display = "GPU (cuda)" if "cuda" in device else "CPU"
-        self._device_combo.set(device_display)
+        # 计算设备状态
+        self._update_device_status()
         self._model_size_combo.set(c.get("model_size", "small"))
         self._compute_combo.set(c.get("compute_type", "int8"))
         self._lang_combo.set(c.get("language", "zh"))
@@ -376,8 +399,9 @@ class SettingsWindow(ctk.CTkToplevel):
         changes["asr_engine"] = (
             "paraformer" if "推荐" in engine_display or "Paraformer" in engine_display else "whisper"
         )
-        device_display = self._device_var.get()
-        changes["asr_device"] = "cuda:0" if "GPU" in device_display or "cuda" in device_display else "cpu"
+        # 设备配置根据当前实际模式设置
+        current_mode = detect_torch_mode()
+        changes["asr_device"] = "cuda:0" if current_mode == "cuda" else "cpu"
         changes["model_size"] = self._model_var.get()
         changes["compute_type"] = self._compute_var.get()
         changes["language"] = self._lang_var.get()
@@ -437,3 +461,238 @@ class SettingsWindow(ctk.CTkToplevel):
             self._model_size_combo.grid_remove()
             self._compute_label.grid_remove()
             self._compute_combo.grid_remove()
+
+    # ─── 设备切换相关方法 ───────────────────────────────────────────
+
+    def _update_device_status(self):
+        """更新计算设备状态显示"""
+        mode = detect_torch_mode()
+        if mode == "cuda":
+            self._device_status_label.configure(
+                text="GPU 模式 (CUDA)",
+                text_color="#4CAF50",
+            )
+            self._device_switch_btn.configure(
+                text="切换到 CPU 模式",
+                fg_color="#757575",
+            )
+            self._device_var.set("GPU (cuda)")
+        else:
+            self._device_status_label.configure(
+                text="CPU 模式",
+                text_color="#2196F3",
+            )
+            addon_size = get_cuda_addon_size()
+            self._device_switch_btn.configure(
+                text=f"升级到 GPU 模式（需下载{addon_size}）",
+                fg_color="#2196F3",
+            )
+            self._device_var.set("CPU")
+
+    def _on_device_switch(self):
+        """处理设备切换按钮点击"""
+        mode = detect_torch_mode()
+        if mode == "cuda":
+            self._confirm_switch_to_cpu()
+        else:
+            self._confirm_switch_to_gpu()
+
+    def _confirm_switch_to_cpu(self):
+        """确认切换到 CPU 模式"""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("切换到 CPU 模式")
+        dialog.geometry("400x180")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # 居中
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 400) // 2
+        y = self.winfo_y() + (self.winfo_height() - 180) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(
+            dialog,
+            text="确认切换到 CPU 模式？\n\n将移除 CUDA 组件并释放约 2GB 磁盘空间。\n切换后需要重启应用生效。",
+            font=ctk.CTkFont(size=13),
+            justify="center",
+        ).pack(expand=True, padx=20, pady=(20, 10))
+
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+
+        def do_switch():
+            dialog.destroy()
+            remove_cuda_addon(on_status=lambda msg: logger.info(msg))
+            self._config.set("asr_device", "cpu")
+            self._update_device_status()
+            self._show_restart_hint()
+
+        ctk.CTkButton(btn_frame, text="确认切换", width=100, command=do_switch).pack(side="right", padx=5)
+        ctk.CTkButton(btn_frame, text="取消", width=100, fg_color="gray", command=dialog.destroy).pack(
+            side="right", padx=5
+        )
+
+    def _confirm_switch_to_gpu(self):
+        """确认并开始下载 CUDA 组件"""
+        # 先检查是否有手动放置的 addon
+        manual_zip = check_manual_addon()
+        if manual_zip:
+            self._install_from_local(manual_zip)
+            return
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("升级到 GPU 模式")
+        dialog.geometry("480x280")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # 居中
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 480) // 2
+        y = self.winfo_y() + (self.winfo_height() - 280) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        addon_size = get_cuda_addon_size()
+
+        self._gpu_dialog = dialog
+        self._gpu_status_label = ctk.CTkLabel(
+            dialog,
+            text=f"需要下载 CUDA 组件（{addon_size}）\n\n下载完成后将自动安装，需重启应用生效。\n请确保网络连接稳定。",
+            font=ctk.CTkFont(size=13),
+            justify="center",
+        )
+        self._gpu_status_label.pack(expand=True, padx=20, pady=(20, 5))
+
+        self._gpu_progress = ctk.CTkProgressBar(dialog, width=400)
+        self._gpu_progress.pack(padx=20, pady=5)
+        self._gpu_progress.set(0)
+
+        self._gpu_progress_label = ctk.CTkLabel(dialog, text="", font=ctk.CTkFont(size=11))
+        self._gpu_progress_label.pack(padx=20, pady=(0, 5))
+
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+
+        self._gpu_confirm_btn = ctk.CTkButton(btn_frame, text="开始下载", width=100, command=self._start_gpu_download)
+        self._gpu_confirm_btn.pack(side="right", padx=5)
+
+        self._gpu_cancel_btn = ctk.CTkButton(btn_frame, text="取消", width=100, fg_color="gray", command=dialog.destroy)
+        self._gpu_cancel_btn.pack(side="right", padx=5)
+
+        # 手动下载链接
+        manual_url = get_manual_download_url()
+        self._gpu_manual_label = ctk.CTkLabel(
+            dialog,
+            text=f"下载失败？手动下载: {manual_url}",
+            font=ctk.CTkFont(size=10),
+            text_color="gray60",
+        )
+        self._gpu_manual_label.pack(padx=20, pady=(0, 10))
+
+    def _start_gpu_download(self):
+        """开始后台下载 CUDA addon"""
+        self._gpu_confirm_btn.configure(state="disabled", text="下载中...")
+        self._gpu_cancel_btn.configure(state="disabled")
+
+        def on_progress(downloaded, total):
+            progress = downloaded / total if total > 0 else 0
+            downloaded_mb = downloaded / (1024 * 1024)
+            total_mb = total / (1024 * 1024)
+            # 在主线程更新 UI
+            self.after(
+                0,
+                lambda: self._update_gpu_progress(progress, f"{downloaded_mb:.0f} / {total_mb:.0f} MB"),
+            )
+
+        def on_status(msg):
+            self.after(0, lambda: self._gpu_status_label.configure(text=msg))
+
+        def download_task():
+            try:
+                zip_path = download_cuda_addon(on_progress=on_progress, on_status=on_status)
+                # 下载完成，安装
+                self.after(0, lambda: self._gpu_status_label.configure(text="正在安装 CUDA 组件..."))
+                success = install_cuda_addon(zip_path)
+                if success:
+                    self.after(0, self._on_gpu_install_success)
+                else:
+                    self.after(0, lambda: self._on_gpu_install_failed("安装失败：zip 文件解压出错"))
+            except RuntimeError as exc:
+                error_msg = str(exc)
+                self.after(0, lambda: self._on_gpu_install_failed(error_msg))
+
+        thread = threading.Thread(target=download_task, daemon=True)
+        thread.start()
+
+    def _update_gpu_progress(self, progress: float, text: str):
+        """更新下载进度条"""
+        try:
+            self._gpu_progress.set(progress)
+            self._gpu_progress_label.configure(text=text)
+        except Exception:
+            pass
+
+    def _on_gpu_install_success(self):
+        """GPU 组件安装成功"""
+        try:
+            self._gpu_status_label.configure(
+                text="CUDA 组件安装完成！\n重启应用后生效。",
+                text_color="#4CAF50",
+            )
+            self._gpu_progress.set(1.0)
+            self._gpu_progress_label.configure(text="完成")
+            self._gpu_confirm_btn.configure(state="normal", text="确定", command=self._gpu_dialog.destroy)
+            self._gpu_cancel_btn.pack_forget()
+            self._config.set("asr_device", "cuda:0")
+            self._update_device_status()
+        except Exception:
+            pass
+
+    def _on_gpu_install_failed(self, error_msg: str):
+        """GPU 组件安装失败"""
+        try:
+            manual_url = get_manual_download_url()
+            self._gpu_status_label.configure(
+                text=f"下载失败: {error_msg}\n\n"
+                f"您可以手动下载 CUDA 组件:\n{manual_url}\n\n"
+                "下载后将 zip 文件放入应用安装目录，\n重启应用将自动安装。",
+                text_color="#F44336",
+                font=ctk.CTkFont(size=12),
+            )
+            self._gpu_confirm_btn.configure(state="normal", text="关闭", command=self._gpu_dialog.destroy)
+            self._gpu_cancel_btn.pack_forget()
+        except Exception:
+            pass
+
+    def _install_from_local(self, zip_path):
+        """从本地文件安装 CUDA addon"""
+        success = install_cuda_addon(zip_path)
+        if success:
+            self._config.set("asr_device", "cuda:0")
+            self._update_device_status()
+            self._show_restart_hint()
+
+    def _show_restart_hint(self):
+        """显示重启提示"""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("提示")
+        dialog.geometry("300x120")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 300) // 2
+        y = self.winfo_y() + (self.winfo_height() - 120) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(
+            dialog,
+            text="设置已更改，重启应用后生效。",
+            font=ctk.CTkFont(size=13),
+        ).pack(expand=True, padx=20, pady=(20, 10))
+
+        ctk.CTkButton(dialog, text="确定", width=80, command=dialog.destroy).pack(pady=(0, 15))

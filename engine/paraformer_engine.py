@@ -16,7 +16,37 @@ import threading
 import numpy as np
 from typing import Callable, Optional
 
+from config import get_app_dir
+
 logger = logging.getLogger(__name__)
+
+
+def resolve_device(configured_device: str) -> str:
+    """根据实际环境解析最终使用的计算设备
+
+    如果配置了 cuda 但实际不可用，自动回退到 cpu。
+
+    Args:
+        configured_device: 用户配置的设备 (cuda:0 / cpu)
+
+    Returns:
+        实际使用的设备字符串
+    """
+    if "cpu" in configured_device.lower():
+        return "cpu"
+
+    try:
+        from utils.torch_manager import detect_torch_mode
+
+        mode = detect_torch_mode()
+        if mode == "cuda":
+            return configured_device  # cuda:0
+        else:
+            logger.info("CUDA 不可用，自动使用 CPU 模式")
+            return "cpu"
+    except ImportError:
+        # torch_manager 不可用时直接尝试配置的设备
+        return configured_device
 
 
 class ParaformerEngine:
@@ -41,7 +71,10 @@ class ParaformerEngine:
             cache_dir: 模型缓存目录（暂未使用，ModelScope 自动管理缓存）
             audio_preprocessor: 音频预处理器（高通滤波+降噪），可选
         """
-        self.device = device
+        # 自动检测并解析设备（配置了 cuda 但不可用时自动回退 cpu）
+        self.device = resolve_device(device)
+        if self.device != device:
+            logger.info(f"ParaformerEngine: 设备从 {device} 回退到 {self.device}")
         self.vad_model = vad_model
         self.cache_dir = cache_dir
         self._preprocessor = audio_preprocessor
@@ -81,9 +114,19 @@ class ParaformerEngine:
                 "disable_update": True,
             }
 
+            # 优先使用打包内置的模型路径
+            bundled_model = get_app_dir() / "models" / "paraformer-zh"
+            if bundled_model.exists():
+                model_kwargs["model"] = str(bundled_model)
+
+            bundled_vad = get_app_dir() / "models" / "fsmn-vad"
+
             # 添加 VAD 模型（用于长音频端点检测）
             if self.vad_model:
-                model_kwargs["vad_model"] = self.vad_model
+                if bundled_vad.exists():
+                    model_kwargs["vad_model"] = str(bundled_vad)
+                else:
+                    model_kwargs["vad_model"] = self.vad_model
 
             self._model = AutoModel(**model_kwargs)
 
@@ -104,8 +147,10 @@ class ParaformerEngine:
                 on_progress(f"模型加载失败: {error_msg}")
 
             # 如果 CUDA 失败，尝试 CPU 回退
-            if "cuda" in self.device.lower() and "cuda" in error_msg.lower():
+            if "cuda" in self.device.lower() and ("cuda" in error_msg.lower() or "gpu" in error_msg.lower()):
                 logger.warning("ParaformerEngine: CUDA 加载失败，尝试 CPU 回退...")
+                if on_progress:
+                    on_progress("GPU 不可用，正在切换到 CPU 模式...")
                 try:
                     from funasr import AutoModel
 
@@ -114,8 +159,14 @@ class ParaformerEngine:
                         "device": "cpu",
                         "disable_update": True,
                     }
+                    # CPU 回退也优先使用内置模型路径
+                    if bundled_model.exists():
+                        model_kwargs["model"] = str(bundled_model)
                     if self.vad_model:
-                        model_kwargs["vad_model"] = self.vad_model
+                        if bundled_vad.exists():
+                            model_kwargs["vad_model"] = str(bundled_vad)
+                        else:
+                            model_kwargs["vad_model"] = self.vad_model
 
                     self._model = AutoModel(**model_kwargs)
                     self.device = "cpu"

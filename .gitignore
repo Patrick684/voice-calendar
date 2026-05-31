@@ -4,8 +4,10 @@ __pycache__/
 *$py.class
 *.egg-info/
 dist/
-build/
 *.egg
+
+# Build artifacts (keep build/*.spec and build/*.iss)
+build/pyinstaller_work/
 
 # Virtual environments
 venv/
