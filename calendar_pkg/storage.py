@@ -368,6 +368,7 @@ class SQLiteStorage:
                 """SELECT * FROM events
                    WHERE start_time > ? AND start_time <= ?
                      AND reminder_minutes IS NOT NULL
+                     AND deleted_at IS NULL
                    ORDER BY start_time ASC""",
                 (from_str, ahead_str),
             )

@@ -253,3 +253,5 @@
 {"text": "明天下午五点体育课体测", "label": "add_event", "expected_title": "体育课体测", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
 {"text": "明天下午四点体育课上课", "label": "add_event", "expected_title": "体育课上课", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
 {"text": "明天早上八点吃早饭", "label": "add_event", "expected_title": "吃早饭", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周日早上八点吃早饭", "label": "add_event", "expected_title": "吃早饭", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "下周六下午两点吃午饭", "label": "add_event", "expected_title": "吃午饭", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}

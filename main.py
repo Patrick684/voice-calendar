@@ -789,6 +789,10 @@ class VoiceCalendarApp:
                 else:
                     self._main_window.refresh_all()
 
+        elif msg_type == "reminder":
+            event = result[1]
+            self._main_window.show_reminder(event)
+
     def _open_settings(self):
         """打开设置窗口"""
         if self._settings_window and self._settings_window.winfo_exists():

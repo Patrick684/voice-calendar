@@ -1548,23 +1548,43 @@ class MainWindow(ctk.CTk):
         """显示事件提醒弹窗"""
         dialog = ctk.CTkToplevel(self)
         dialog.title("事件提醒")
-        dialog.geometry("350x150")
+        dialog.geometry("350x180")
         dialog.attributes("-topmost", True)
 
-        time_str = event.start_time.strftime("%H:%M")
+        # 计算剩余时间
+        from datetime import datetime as dt
+
+        now = dt.now()
+        diff = event.start_time - now
+        minutes_left = max(0, int(diff.total_seconds() / 60))
+        if minutes_left > 0:
+            time_hint = f"还有 {minutes_left} 分钟"
+        else:
+            time_hint = "已到时间"
+
+        time_str = event.start_time.strftime("%m月%d日 %H:%M")
+
         ctk.CTkLabel(
             dialog,
-            text=f"⏰ 提醒: {event.title}",
+            text=f"\u23f0 提醒: {event.title}",
             font=ctk.CTkFont(size=16, weight="bold"),
         ).pack(pady=(15, 5))
         ctk.CTkLabel(
             dialog,
-            text=f"时间: {time_str}",
+            text=f"时间: {time_str}  ({time_hint})",
             font=ctk.CTkFont(size=13),
         ).pack()
+        if event.category:
+            cat_color = self._category_colors.get(event.category, "#757575")
+            ctk.CTkLabel(
+                dialog,
+                text=f"分类: {event.category}",
+                font=ctk.CTkFont(size=12),
+                text_color=cat_color,
+            ).pack(pady=(3, 0))
         ctk.CTkButton(
             dialog,
             text="知道了",
             width=80,
             command=dialog.destroy,
-        ).pack(pady=15)
+        ).pack(pady=12)
