@@ -249,3 +249,7 @@
 {"text": "查看今天所有事件", "label": "query_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
 {"text": "查看今天所有事件", "label": "query_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
 {"text": "查看今天所有事件", "label": "query_event", "expected_title": "", "expected_recurrence": "", "confidence": 0.85, "note": "自动记录", "accepted": true}
+{"text": "明天下午五点体育课体测", "label": "add_event", "expected_title": "体育课体测", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午五点体育课体测", "label": "add_event", "expected_title": "体育课体测", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天下午四点体育课上课", "label": "add_event", "expected_title": "体育课上课", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}
+{"text": "明天早上八点吃早饭", "label": "add_event", "expected_title": "吃早饭", "expected_recurrence": "", "confidence": 0.75, "note": "自动记录", "accepted": true}

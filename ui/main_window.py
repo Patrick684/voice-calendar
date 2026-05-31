@@ -436,16 +436,43 @@ class MainWindow(ctk.CTk):
             pass
 
     # 卡片高亮动画参数
-    _FLASH_COLOR = "#f39c12"  # 金色高亮
+    _FLASH_COLOR = "#2ecc71"  # 绿色高亮（与今天日期格同色）
     _FLASH_STEPS = [  # (fg_color, delay_ms)
-        (_FLASH_COLOR, 150),
+        (_FLASH_COLOR, 200),
         (None, 150),  # None = 恢复默认
-        (_FLASH_COLOR, 150),
+        (_FLASH_COLOR, 200),
         (None, 0),
     ]
 
+    def _scroll_to_card(self, event_id: int):
+        """滚动事件列表使目标卡片可见"""
+        card = self._event_card_widgets.get(event_id)
+        if not card or not card.winfo_exists():
+            return
+        try:
+            canvas = self._event_scroll._parent_canvas
+            canvas.update_idletasks()
+            # 卡片相对于滚动容器内部 frame 的 y 位置
+            card_y = card.winfo_y()
+            scroll_height = canvas.winfo_height()
+            # bbox[3] 是滚动区域总高度
+            bbox = canvas.bbox("all")
+            if not bbox:
+                return
+            total_height = bbox[3] - bbox[1]
+            if total_height <= scroll_height:
+                return  # 内容不超出视口，无需滚动
+            # 计算目标位置（卡片置于视口上 1/3 处）
+            target_pos = max(0.0, (card_y - scroll_height / 3) / total_height)
+            target_pos = min(target_pos, 1.0)
+            canvas.yview_moveto(target_pos)
+        except Exception:
+            pass
+
     def _flash_card(self, event_id: int):
         """对指定事件卡片执行闪烁高亮动画"""
+        # 先滚动到卡片位置
+        self._scroll_to_card(event_id)
         card = self._event_card_widgets.get(event_id)
         if not card or not card.winfo_exists():
             return
