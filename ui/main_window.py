@@ -447,19 +447,30 @@ class MainWindow(ctk.CTk):
 
     def _create_event_card(self, event: CalendarEvent):
         """创建事件卡片（紧凑布局 + 描述自适应高度）"""
-        card = ctk.CTkFrame(self._event_scroll, corner_radius=6)
+        card = ctk.CTkFrame(self._event_scroll, corner_radius=4)
         card.pack(fill="x", pady=2)
+
+        # 无描述时固定高度，有描述时自适应
+        if not event.description:
+            card.configure(height=36)
+            card.pack_propagate(False)
 
         # 分类颜色条
         cat_color = self._category_colors.get(event.category, "#757575")
         ctk.CTkFrame(card, width=4, fg_color=cat_color, corner_radius=2).pack(
-            side="left", fill="y", padx=(4, 0), pady=3
+            side="left", fill="y", padx=(3, 0), pady=2
         )
 
-        # 内容区
-        content = ctk.CTkFrame(card, fg_color="transparent")
-        content.pack(side="left", fill="both", expand=True)
+        # 分类标签（右侧）
+        if event.category:
+            ctk.CTkLabel(
+                card,
+                text=event.category,
+                font=ctk.CTkFont(size=12),
+                text_color=cat_color,
+            ).pack(side="right", padx=(0, 8), pady=2)
 
+        # 内容区（无额外 frame 包装，直接放卡片内）
         # 第一行：时间 + 标题 + 优先级
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
         if not event.is_all_day and event.end_time and event.end_time != event.start_time:
@@ -475,31 +486,22 @@ class MainWindow(ctk.CTk):
 
         title_text = f"{time_str}  {event.title}{priority_marker}"
         ctk.CTkLabel(
-            content,
+            card,
             text=title_text,
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=14),
             anchor="w",
-        ).pack(fill="x", padx=8, pady=(4, 1))
+        ).pack(side="top", fill="x", padx=(10, 0), pady=(3, 0))
 
-        # 描述行（有描述时显示，高度随文本自适应）
+        # 描述行（有描述时显示，卡片高度自动扩展）
         if event.description:
             ctk.CTkLabel(
-                content,
+                card,
                 text=event.description,
-                font=ctk.CTkFont(size=10),
+                font=ctk.CTkFont(size=12),
                 text_color="#888888",
                 anchor="w",
                 wraplength=240,
-            ).pack(fill="x", padx=8, pady=(0, 3))
-
-        # 分类标签（右侧）
-        if event.category:
-            ctk.CTkLabel(
-                card,
-                text=event.category,
-                font=ctk.CTkFont(size=10),
-                text_color=cat_color,
-            ).pack(side="right", padx=(0, 8), pady=3)
+            ).pack(side="top", fill="x", padx=(10, 0), pady=(0, 3))
 
         # 右键菜单（快捷编辑）
         if event.id is not None:
