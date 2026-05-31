@@ -15,6 +15,7 @@ class Config:
         "hotkey_mode": "hold",  # hold: 按住录音, toggle: 切换录音
         # 语音识别设置
         "asr_engine": "paraformer",  # paraformer / whisper
+        "asr_device": "cuda:0",  # cuda:0 / cpu
         "model_size": "small",
         "language": "zh",
         "beam_size": 5,
@@ -23,12 +24,12 @@ class Config:
         "sample_rate": 16000,
         "audio_device": None,  # None 表示使用默认设备
         # 日历设置
-        "default_reminder_minutes": 15,  # 默认提前提醒分钟数
+        "default_reminder_minutes": 30,  # 默认提前提醒分钟数
         "week_start_day": 0,  # 0=周一, 6=周日
         "calendar_view": "month",  # month/week/day
         # 提醒设置
         "reminder_enabled": True,
-        "reminder_sound": True,
+        "reminder_sound": False,  # 提示音默认关闭
         "reminder_notification": True,
         # 个性化提醒音效（按事件分类）
         "reminder_sounds": {
@@ -53,9 +54,12 @@ class Config:
         "intent_model_enabled": True,
         "intent_model_path": "models/intent_classifier",
         "intent_confidence_threshold": 0.8,
+        # 系统托盘与后台设置
+        "minimize_to_tray": True,  # 关闭窗口时最小化到托盘
+        "autostart": True,  # 开机自动启动
         # UI 设置
         "theme": "system",  # system, light, dark
-        "start_minimized": False,
+        "start_minimized": False,  # 启动时最小化到托盘
         "show_notifications": True,
         # 热词设置
         "hotwords": [],
@@ -145,6 +149,13 @@ class Config:
     def history_file(self) -> Path:
         """识别历史文件路径"""
         return self.config_dir / "history.json"
+
+    @property
+    def sounds_dir(self) -> Path:
+        """音效文件目录"""
+        sounds = self.config_dir / "sounds"
+        sounds.mkdir(exist_ok=True)
+        return sounds
 
     @property
     def calendar_db_path(self) -> str:
