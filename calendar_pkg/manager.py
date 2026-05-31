@@ -269,6 +269,10 @@ class CalendarManager:
         """彻底删除事件"""
         return self._storage.hard_delete_event(event_id)
 
+    def clear_all_deleted(self) -> int:
+        """一键清空回收站"""
+        return self._storage.clear_all_deleted()
+
     def purge_deleted(self, days: int = 30) -> int:
         """清理超过指定天数的已删除事件"""
         return self._storage.purge_deleted(days)

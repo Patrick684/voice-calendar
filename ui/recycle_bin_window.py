@@ -40,9 +40,11 @@ class RecycleBinWindow(ctk.CTkToplevel):
         self._on_clear_all = on_clear_all
         self._sort_mode = "delete_time"  # "delete_time" | "event_date"
         self._events = events
+        self._card_widgets: dict[int, ctk.CTkFrame] = {}  # event_id -> card widget
 
         self._build_ui()
-        self._render_events(events)
+        # 延迟渲染，先让窗口显示出来
+        self.after(10, lambda: self._render_events(events))
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -193,6 +195,9 @@ class RecycleBinWindow(ctk.CTkToplevel):
         """创建回收站事件卡片（含恢复/删除按钮）"""
         card = ctk.CTkFrame(self._scroll_frame, corner_radius=4)
         card.pack(fill="x", pady=3)
+        # 记录卡片引用
+        if event.id is not None:
+            self._card_widgets[event.id] = card
 
         # 颜色条
         cat_color = CATEGORY_COLORS.get(event.category, "#757575")
@@ -252,14 +257,34 @@ class RecycleBinWindow(ctk.CTkToplevel):
         ).pack(side="top")
 
     def _do_restore(self, event_id: int):
-        """恢复事件"""
+        """恢复事件（局部移除卡片，不全量重建）"""
+        self._remove_card(event_id)
         if self._on_restore:
             self._on_restore(event_id)
 
     def _do_hard_delete(self, event_id: int):
-        """彻底删除事件"""
+        """彻底删除事件（局部移除卡片，不全量重建）"""
+        self._remove_card(event_id)
         if self._on_hard_delete:
             self._on_hard_delete(event_id)
+
+    def _remove_card(self, event_id: int):
+        """局部移除单张卡片并更新计数"""
+        card = self._card_widgets.pop(event_id, None)
+        if card:
+            card.destroy()
+        self._events = [e for e in self._events if e.id != event_id]
+        self._title_label.configure(text=f"\ud83d\uddd1 \u56de\u6536\u7ad9 ({len(self._events)})")
+        # 如果清空了，显示空状态
+        if not self._events:
+            for widget in self._scroll_frame.winfo_children():
+                widget.destroy()
+            ctk.CTkLabel(
+                self._scroll_frame,
+                text="\u56de\u6536\u7ad9\u4e3a\u7a7a",
+                font=ctk.CTkFont(size=12),
+                text_color="gray",
+            ).pack(pady=30)
 
     def _do_clear_all(self):
         """一键清空回收站"""
@@ -267,7 +292,8 @@ class RecycleBinWindow(ctk.CTkToplevel):
             self._on_clear_all()
 
     def refresh(self, events: list):
-        """刷新事件列表"""
+        """刷新事件列表（外部调用时全量重建）"""
+        self._card_widgets.clear()
         self._render_events(events)
 
     def _on_close(self):

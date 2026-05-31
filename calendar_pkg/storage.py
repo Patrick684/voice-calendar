@@ -260,6 +260,23 @@ class SQLiteStorage:
         finally:
             conn.close()
 
+    def clear_all_deleted(self) -> int:
+        """一键清空所有已删除事件
+
+        Returns:
+            删除的事件数量
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("DELETE FROM events WHERE deleted_at IS NOT NULL")
+            conn.commit()
+            count = cursor.rowcount
+            if count > 0:
+                logger.info(f"回收站已清空: {count} 条事件")
+            return count
+        finally:
+            conn.close()
+
     def get_event_by_id(self, event_id: int) -> Optional[CalendarEvent]:
         """根据 ID 获取事件
 

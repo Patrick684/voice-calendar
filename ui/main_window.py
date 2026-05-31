@@ -1448,9 +1448,7 @@ class MainWindow(ctk.CTk):
         """恢复已删除事件"""
         self._manager.restore_event(event_id)
         logger.info(f"回收站恢复事件: id={event_id}")
-        # 刷新回收站和主界面
-        if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
-            self._recycle_bin_window.refresh(self._manager.get_deleted_events())
+        # 只刷新主界面（回收站窗口已局部移除卡片）
         self._refresh_calendar()
         self._refresh_event_list()
 
@@ -1458,17 +1456,13 @@ class MainWindow(ctk.CTk):
         """彻底删除事件"""
         self._manager.hard_delete_event(event_id)
         logger.info(f"回收站彻底删除: id={event_id}")
-        if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
-            self._recycle_bin_window.refresh(self._manager.get_deleted_events())
 
     def _on_clear_all_deleted(self):
         """一键清空回收站"""
-        deleted = self._manager.get_deleted_events()
-        for event in deleted:
-            self._manager.hard_delete_event(event.id)
-        logger.info(f"回收站一键清空: {len(deleted)} 条")
+        count = self._manager.clear_all_deleted()
+        logger.info(f"回收站一键清空: {count} 条")
         if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
-            self._recycle_bin_window.refresh(self._manager.get_deleted_events())
+            self._recycle_bin_window.refresh([])
 
     def show_reminder(self, event: CalendarEvent):
         """显示事件提醒弹窗"""
