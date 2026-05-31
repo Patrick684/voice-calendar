@@ -687,13 +687,13 @@ class VoiceCalendarApp:
     def _parse_relative_offset(text: str, default: int = 60) -> int:
         """从文本中提取相对偏移量（分钟）
 
-        支持: "N个小时", "N小时", "N分钟", "半小时"
+        支持: "N个小时", "N小时", "N分钟", "半小时", "半个小时"
         默认返回 default 分钟
         """
         import re
 
-        # 半小时
-        if "半小时" in text or "半天" in text:
+        # 半小时 / 半个小时
+        if "半小时" in text or "半个小时" in text or "半天" in text:
             if "半天" in text:
                 return 720
             return 30
@@ -826,13 +826,13 @@ class VoiceCalendarApp:
     def _parse_relative_offset(text: str, default: int = 60) -> int:
         """从文本中提取相对偏移量（分钟）
 
-        支持: "N个小时", "N小时", "N分钟", "半小时"
+        支持: "N个小时", "N小时", "N分钟", "半小时", "半个小时"
         默认返回 default 分钟
         """
         import re
 
-        # 半小时
-        if "半小时" in text or "半天" in text:
+        # 半小时 / 半个小时
+        if "半小时" in text or "半个小时" in text or "半天" in text:
             if "半天" in text:
                 return 720
             return 30
@@ -932,9 +932,13 @@ class VoiceCalendarApp:
 
     def _open_settings(self):
         """打开设置窗口"""
-        if self._settings_window and self._settings_window.winfo_exists():
-            self._settings_window.focus()
-            return
+        try:
+            if self._settings_window and self._settings_window.winfo_exists():
+                self._settings_window.focus()
+                return
+        except Exception:
+            # 主题切换后窗口可能已损坏，清除引用
+            self._settings_window = None
 
         self._settings_window = SettingsWindow(
             self._main_window,

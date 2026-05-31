@@ -51,6 +51,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self.geometry("520x580")
         self.resizable(False, False)
         self.transient(master)
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
 
         self._setup_ui()
 
