@@ -26,6 +26,7 @@ class RecycleBinWindow(ctk.CTkToplevel):
         events: list,
         on_restore: Optional[Callable] = None,
         on_hard_delete: Optional[Callable] = None,
+        on_clear_all: Optional[Callable] = None,
     ):
         super().__init__(master)
 
@@ -36,6 +37,7 @@ class RecycleBinWindow(ctk.CTkToplevel):
 
         self._on_restore = on_restore
         self._on_hard_delete = on_hard_delete
+        self._on_clear_all = on_clear_all
 
         self._build_ui()
         self._render_events(events)
@@ -44,13 +46,29 @@ class RecycleBinWindow(ctk.CTkToplevel):
 
     def _build_ui(self):
         """构建窗口 UI"""
-        # 标题
+        # 顶部栏（标题 + 清空按钮）
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=10, pady=(12, 0))
+
         self._title_label = ctk.CTkLabel(
-            self,
+            header,
             text="🗑 回收站",
             font=ctk.CTkFont(size=14, weight="bold"),
         )
-        self._title_label.pack(padx=10, pady=(12, 6), anchor="w")
+        self._title_label.pack(side="left")
+
+        # 右上角清空按钮
+        self._clear_btn = ctk.CTkButton(
+            header,
+            text="清空",
+            width=50,
+            height=24,
+            font=ctk.CTkFont(size=11),
+            fg_color="#c0392b",
+            hover_color="#e74c3c",
+            command=self._do_clear_all,
+        )
+        self._clear_btn.pack(side="right")
 
         # 提示
         ctk.CTkLabel(
@@ -58,7 +76,7 @@ class RecycleBinWindow(ctk.CTkToplevel):
             text="已删除的事件会保留 30 天",
             font=ctk.CTkFont(size=11),
             text_color="gray",
-        ).pack(padx=10, anchor="w")
+        ).pack(padx=10, anchor="w", pady=(4, 0))
 
         # 事件滚动列表
         self._scroll_frame = ctk.CTkScrollableFrame(self)
@@ -74,7 +92,7 @@ class RecycleBinWindow(ctk.CTkToplevel):
         ).pack(pady=(0, 10))
 
     def _render_events(self, events: list):
-        """渲染已删除事件列表"""
+        """渲染已删除事件列表（按日期分组）"""
         for widget in self._scroll_frame.winfo_children():
             widget.destroy()
 
@@ -89,7 +107,19 @@ class RecycleBinWindow(ctk.CTkToplevel):
             ).pack(pady=30)
             return
 
+        # 按日期分组
+        current_date = None
         for event in events:
+            event_date = event.start_time.strftime("%Y-%m-%d")
+            if event_date != current_date:
+                current_date = event_date
+                # 日期分割线
+                ctk.CTkLabel(
+                    self._scroll_frame,
+                    text=f"────── {current_date} ──────",
+                    font=ctk.CTkFont(size=11),
+                    text_color="#666666",
+                ).pack(fill="x", pady=(6, 2))
             self._create_event_card(event)
 
     def _create_event_card(self, event: CalendarEvent):
@@ -163,6 +193,11 @@ class RecycleBinWindow(ctk.CTkToplevel):
         """彻底删除事件"""
         if self._on_hard_delete:
             self._on_hard_delete(event_id)
+
+    def _do_clear_all(self):
+        """一键清空回收站"""
+        if self._on_clear_all:
+            self._on_clear_all()
 
     def refresh(self, events: list):
         """刷新事件列表"""

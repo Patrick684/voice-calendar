@@ -1441,6 +1441,7 @@ class MainWindow(ctk.CTk):
                 events,
                 on_restore=self._on_restore_event,
                 on_hard_delete=self._on_hard_delete_event,
+                on_clear_all=self._on_clear_all_deleted,
             )
 
     def _on_restore_event(self, event_id: int):
@@ -1457,6 +1458,15 @@ class MainWindow(ctk.CTk):
         """彻底删除事件"""
         self._manager.hard_delete_event(event_id)
         logger.info(f"回收站彻底删除: id={event_id}")
+        if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
+            self._recycle_bin_window.refresh(self._manager.get_deleted_events())
+
+    def _on_clear_all_deleted(self):
+        """一键清空回收站"""
+        deleted = self._manager.get_deleted_events()
+        for event in deleted:
+            self._manager.hard_delete_event(event.id)
+        logger.info(f"回收站一键清空: {len(deleted)} 条")
         if self._recycle_bin_window and self._recycle_bin_window.winfo_exists():
             self._recycle_bin_window.refresh(self._manager.get_deleted_events())
 
