@@ -87,85 +87,53 @@ class QueryWindow(ctk.CTkToplevel):
             self._create_event_card(event)
 
     def _create_event_card(self, event: CalendarEvent):
-        """创建事件卡片（风格与主窗口一致）"""
-        card = ctk.CTkFrame(self._scroll_frame, corner_radius=8)
-        card.pack(fill="x", pady=3)
+        """创建紧凑事件卡片（仅展示时间、标题、类别、优先级）"""
+        card = ctk.CTkFrame(self._scroll_frame, corner_radius=6, height=36)
+        card.pack(fill="x", pady=2)
+        card.pack_propagate(False)
 
         # 分类颜色条
         cat_color = CATEGORY_COLORS.get(event.category, "#757575")
-        color_bar = ctk.CTkFrame(card, width=4, fg_color=cat_color, corner_radius=2)
-        color_bar.pack(side="left", fill="y", padx=(5, 0), pady=3)
+        ctk.CTkFrame(card, width=4, fg_color=cat_color, corner_radius=2).pack(
+            side="left", fill="y", padx=(4, 0), pady=4
+        )
 
-        # 内容区
-        content = ctk.CTkFrame(card, fg_color="transparent")
-        content.pack(side="left", fill="both", expand=True)
-
-        # 时间文本
+        # 时间
         time_str = "全天" if event.is_all_day else event.start_time.strftime("%H:%M")
-        duration_tag = ""
-        if not event.is_all_day and event.end_time and event.end_time != event.start_time:
-            duration_min = event.duration_minutes
-            if duration_min > 0:
-                time_str += f"-{event.end_time.strftime('%H:%M')}"
-                if duration_min >= 60:
-                    h = int(duration_min // 60)
-                    m = int(duration_min % 60)
-                    duration_tag = f" ({h}h{m}min)" if m else f" ({h}h)"
-                else:
-                    duration_tag = f" ({int(duration_min)}min)"
-
-        title_text = f"{time_str}{duration_tag}  {event.title}"
+        ctk.CTkLabel(
+            card,
+            text=time_str,
+            font=ctk.CTkFont(size=11),
+            text_color="#888888",
+            width=40,
+        ).pack(side="left", padx=(6, 4), pady=4)
 
         # 优先级标记
         priority_marker = ""
         if event.priority >= 2:
-            priority_marker = " ❗"
+            priority_marker = "❗"
         elif event.priority == 1:
-            priority_marker = " ★"
+            priority_marker = "★ "
 
+        # 标题（含优先级前缀）
+        title = event.title
+        if len(title) > 14:
+            title = title[:14] + "..."
         ctk.CTkLabel(
-            content,
-            text=title_text + priority_marker,
+            card,
+            text=f"{priority_marker}{title}",
             font=ctk.CTkFont(size=12),
             anchor="w",
-            wraplength=220,
-        ).pack(fill="x", padx=8, pady=(6, 2))
+        ).pack(side="left", fill="x", expand=True, padx=(0, 4), pady=4)
 
-        # 日期行（查询窗口需要显示日期，因为可能跨日）
-        date_str = event.start_time.strftime("%m/%d")
-        ctk.CTkLabel(
-            content,
-            text=date_str,
-            font=ctk.CTkFont(size=10),
-            text_color="#888888",
-            anchor="w",
-        ).pack(fill="x", padx=8, pady=(0, 2))
-
-        # 描述
-        if event.description:
-            ctk.CTkLabel(
-                content,
-                text=event.description,
-                font=ctk.CTkFont(size=10),
-                text_color="gray",
-                anchor="w",
-                wraplength=220,
-            ).pack(fill="x", padx=8, pady=(0, 4))
-
-        # 分类 + 标签
-        info_parts = []
+        # 分类标签（右侧）
         if event.category:
-            info_parts.append(f"[{event.category}]")
-        if event.tags:
-            info_parts.extend(f"[{t}]" for t in event.tags)
-        if info_parts:
             ctk.CTkLabel(
-                content,
-                text="  ".join(info_parts),
+                card,
+                text=event.category,
                 font=ctk.CTkFont(size=10),
                 text_color=cat_color,
-                anchor="w",
-            ).pack(fill="x", padx=8, pady=(0, 5))
+            ).pack(side="right", padx=(0, 8), pady=4)
 
     def _on_close(self):
         """关闭窗口"""

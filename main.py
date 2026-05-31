@@ -774,17 +774,19 @@ class VoiceCalendarApp:
             message = result[1]
             cmd_action = result[2] if len(result) > 2 else None
             event_time = result[3] if len(result) > 3 else None
-            self._main_window.show_voice_result(message)
-            self._main_window.set_voice_state(VoiceState.SUCCESS, message)
-            # 添加事件后导航到对应日期
-            if cmd_action == "add" and event_time:
-                self._main_window.navigate_to_date(event_time)
-            elif cmd_action == "query" and event_time:
-                # 打开独立查询结果窗口
+            if cmd_action == "query" and event_time:
+                # 查询指令：仅打开独立窗口，不在反馈区输出
                 query_title, query_events = event_time
                 self._main_window.show_query_window(query_title, query_events)
+                self._main_window.set_voice_state(VoiceState.IDLE)
             else:
-                self._main_window.refresh_all()
+                self._main_window.show_voice_result(message)
+                self._main_window.set_voice_state(VoiceState.SUCCESS, message)
+                # 添加事件后导航到对应日期
+                if cmd_action == "add" and event_time:
+                    self._main_window.navigate_to_date(event_time)
+                else:
+                    self._main_window.refresh_all()
 
     def _open_settings(self):
         """打开设置窗口"""
