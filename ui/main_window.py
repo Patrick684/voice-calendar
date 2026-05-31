@@ -1445,12 +1445,16 @@ class MainWindow(ctk.CTk):
             )
 
     def _on_restore_event(self, event_id: int):
-        """恢复已删除事件"""
+        """恢复已删除事件并导航到该事件日期"""
         self._manager.restore_event(event_id)
         logger.info(f"回收站恢复事件: id={event_id}")
-        # 只刷新主界面（回收站窗口已局部移除卡片）
-        self._refresh_calendar()
-        self._refresh_event_list()
+        # 导航到恢复事件所在日期
+        event = self._manager.get_event(event_id)
+        if event:
+            self.navigate_to_date(event.start_time)
+        else:
+            self._refresh_calendar()
+            self._refresh_event_list()
 
     def _on_hard_delete_event(self, event_id: int):
         """彻底删除事件"""
