@@ -390,7 +390,7 @@ class VoiceCalendarApp:
             logger.info(f"指令不完整: {check['suggestion']}")
             command = self._completer.complete_command(command)
 
-        self._calendar.add_event(
+        new_event = self._calendar.add_event(
             title=command.title,
             start_time=command.time,
             end_time=getattr(command, "end_time", None),
@@ -409,7 +409,7 @@ class VoiceCalendarApp:
             msg += f" | 🏆 解锁成就: {ach_names}"
             logger.info(f"成就解锁: {ach_names}")
 
-        self._result_queue.put(("command_executed", msg, "add", command.time))
+        self._result_queue.put(("command_executed", msg, "add", command.time, new_event.id))
 
     def _execute_delete_event(self, command):
         """执行删除事件（查找匹配的事件并删除）"""
@@ -774,6 +774,7 @@ class VoiceCalendarApp:
             message = result[1]
             cmd_action = result[2] if len(result) > 2 else None
             event_time = result[3] if len(result) > 3 else None
+            event_id = result[4] if len(result) > 4 else None
             if cmd_action == "query" and event_time:
                 # 查询指令：仅打开独立窗口，不在反馈区输出
                 query_title, query_events = event_time
@@ -782,9 +783,9 @@ class VoiceCalendarApp:
             else:
                 self._main_window.show_voice_result(message)
                 self._main_window.set_voice_state(VoiceState.SUCCESS, message)
-                # 添加事件后导航到对应日期
+                # 添加事件后导航到对应日期并高亮卡片
                 if cmd_action == "add" and event_time:
-                    self._main_window.navigate_to_date(event_time)
+                    self._main_window.navigate_to_date(event_time, highlight_event_id=event_id)
                 else:
                     self._main_window.refresh_all()
 

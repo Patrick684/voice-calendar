@@ -385,8 +385,9 @@ class MainWindow(ctk.CTk):
         for widget in self._event_scroll.winfo_children():
             widget.destroy()
 
-        # 清空分组 widget 引用
+        # 清空分组 widget 引用 和 卡片索引
         self._priority_group_widgets = {}
+        self._event_card_widgets = {}
 
         try:
             date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -434,6 +435,41 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
 
+    # 卡片高亮动画参数
+    _FLASH_COLOR = "#f39c12"  # 金色高亮
+    _FLASH_STEPS = [  # (fg_color, delay_ms)
+        (_FLASH_COLOR, 150),
+        (None, 150),  # None = 恢复默认
+        (_FLASH_COLOR, 150),
+        (None, 0),
+    ]
+
+    def _flash_card(self, event_id: int):
+        """对指定事件卡片执行闪烁高亮动画"""
+        card = self._event_card_widgets.get(event_id)
+        if not card or not card.winfo_exists():
+            return
+        # 记录原始颜色
+        try:
+            original_color = card.cget("fg_color")
+        except Exception:
+            original_color = ("gray86", "gray17")
+
+        def step(idx):
+            if not card.winfo_exists():
+                return
+            if idx >= len(self._FLASH_STEPS):
+                return
+            color, delay = self._FLASH_STEPS[idx]
+            card.configure(fg_color=color if color else original_color)
+            if delay > 0:
+                self.after(delay, lambda: step(idx + 1))
+            else:
+                # 最后一步，确保恢复
+                card.configure(fg_color=original_color)
+
+        step(0)
+
     def _render_priority_groups(self, events):
         """按优先级分组渲染事件列表（含分组标题）"""
         # 将事件按优先级归类
@@ -473,6 +509,9 @@ class MainWindow(ctk.CTk):
         """创建事件卡片（紧凑布局 + 描述自适应高度）"""
         card = ctk.CTkFrame(self._event_scroll, corner_radius=2)
         card.pack(fill="x", pady=2)
+        # 索引卡片
+        if event.id is not None:
+            self._event_card_widgets[event.id] = card
 
         # 无描述时固定高度，有描述时自适应
         if not event.description:
@@ -1327,17 +1366,23 @@ class MainWindow(ctk.CTk):
                 # 编辑模式
                 self._manager.update_event(event.id, **data)
                 logger.info(f"事件已更新: {data['title']}")
+                target_date = data.get("start_time")
+                if target_date:
+                    self.navigate_to_date(target_date, highlight_event_id=event.id)
+                else:
+                    self._refresh_calendar()
+                    self._refresh_event_list()
             else:
                 # 添加模式
-                self._manager.add_event(**data)
+                new_event = self._manager.add_event(**data)
                 logger.info(f"事件已添加: {data['title']}")
-            # 导航到事件所在日期
-            target_date = data.get("start_time")
-            if target_date:
-                self.navigate_to_date(target_date)
-            else:
-                self._refresh_calendar()
-                self._refresh_event_list()
+                # 导航到事件所在日期并高亮卡片
+                target_date = data.get("start_time")
+                if target_date:
+                    self.navigate_to_date(target_date, highlight_event_id=new_event.id)
+                else:
+                    self._refresh_calendar()
+                    self._refresh_event_list()
 
         def on_delete(event_id: int):
             title = self._manager.delete_event(event_id)
@@ -1386,16 +1431,20 @@ class MainWindow(ctk.CTk):
         """显示语音识别结果"""
         self._voice_panel.set_result(text)
 
-    def navigate_to_date(self, target_date: datetime):
+    def navigate_to_date(self, target_date: datetime, highlight_event_id: int = None):
         """导航到指定日期并刷新视图（公共接口）
 
         自动切换年月、选中目标日期、刷新日历和事件列表。
+        可选高亮指定事件卡片。
         """
         self._view_year = target_date.year
         self._view_month = target_date.month
         self._selected_date = target_date
         self._refresh_calendar()
         self._refresh_event_list()
+        # 延迟高亮目标卡片（等待卡片渲染完成）
+        if highlight_event_id is not None:
+            self.after(30, lambda: self._flash_card(highlight_event_id))
 
     def refresh_all(self):
         """刷新所有视图"""
@@ -1448,10 +1497,10 @@ class MainWindow(ctk.CTk):
         """恢复已删除事件并导航到该事件日期"""
         self._manager.restore_event(event_id)
         logger.info(f"回收站恢复事件: id={event_id}")
-        # 导航到恢复事件所在日期
+        # 导航到恢复事件所在日期并高亮卡片
         event = self._manager.get_event(event_id)
         if event:
-            self.navigate_to_date(event.start_time)
+            self.navigate_to_date(event.start_time, highlight_event_id=event_id)
         else:
             self._refresh_calendar()
             self._refresh_event_list()
