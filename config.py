@@ -2,8 +2,17 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Optional
+
+
+def get_app_dir() -> Path:
+    """获取应用根目录（兼容开发模式和 PyInstaller 打包模式）"""
+    if getattr(sys, "frozen", False):
+        # PyInstaller --onedir 模式: exe 所在目录
+        return Path(sys.executable).parent
+    return Path(__file__).parent
 
 
 class Config:
@@ -16,6 +25,7 @@ class Config:
         # 语音识别设置
         "asr_engine": "paraformer",  # paraformer / whisper
         "asr_device": "cuda:0",  # cuda:0 / cpu
+        "torch_mode": "auto",  # auto / cpu / cuda（auto=自动检测）
         "model_size": "small",
         "language": "zh",
         "beam_size": 5,

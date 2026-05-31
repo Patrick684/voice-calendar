@@ -50,6 +50,7 @@ class CalendarEvent:
     category: str = ""
     recurrence_rule: str = ""
     recurrence_end: Optional[datetime] = None
+    recurrence_parent_id: Optional[int] = None
     tags: List[str] = field(default_factory=list)
     id: Optional[int] = None
     created_at: Optional[str] = None
@@ -80,6 +81,7 @@ class CalendarEvent:
         # tags 列表转为逗号分隔字符串（SQLite 存储）
         if isinstance(data.get("tags"), list):
             data["tags"] = ",".join(data["tags"]) if data["tags"] else ""
+        # recurrence_parent_id 保持为 int 或 None
         return data
 
     @classmethod
@@ -112,6 +114,7 @@ class CalendarEvent:
             category=row.get("category", "") or "",
             recurrence_rule=row.get("recurrence_rule", "") or "",
             recurrence_end=cls._parse_datetime(row.get("recurrence_end")),
+            recurrence_parent_id=row.get("recurrence_parent_id"),
             tags=tags,
             created_at=row.get("created_at"),
             updated_at=row.get("updated_at"),

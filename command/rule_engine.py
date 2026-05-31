@@ -496,7 +496,7 @@ class RuleEngine:
             1.0,
             "hour",
         ),
-        (re.compile(r"\u534a\u5c0f\u65f6"), 0.5, "hour"),
+        (re.compile(r"\u534a\u4e2a?\u5c0f\u65f6"), 0.5, "hour"),
         (re.compile(r"\u534a\u5929"), 12.0, "hour"),
         (
             re.compile(r"([\u4e00\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\d]+)\s*\u5206\u949f?"),

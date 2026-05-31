@@ -83,20 +83,26 @@ class VoiceCalendarApp:
         """初始化所有子模块"""
         logger.info("正在初始化各模块...")
 
+        # 检查是否有手动放置的 CUDA addon 待安装
+        self._check_pending_cuda_addon()
+
         # 日历管理器
         self._calendar = CalendarManager(
             db_path=self.config.calendar_db_path,
             default_reminder_minutes=self.config.get("default_reminder_minutes", 15),
         )
+        # 启动时自动补充循环事件实例
+        self._calendar.expand_recurring_events()
 
         # 语音识别引擎（根据配置选择 Paraformer 或 Whisper）
         asr_engine = self.config.get("asr_engine", "paraformer")
+        asr_device = self.config.get("asr_device", "cuda:0")
         if asr_engine == "paraformer":
             self._asr = ParaformerEngine(
-                device="cuda:0",
+                device=asr_device,
                 cache_dir=str(self.config.model_cache_dir),
             )
-            logger.info("ASR 引擎: Paraformer (GPU)")
+            logger.info(f"ASR 引擎: Paraformer (device={self._asr.device})")
         else:
             self._asr = WhisperEngine(
                 model_size=self.config.get("model_size", "small"),
@@ -162,6 +168,23 @@ class VoiceCalendarApp:
         )
 
         logger.info("模块初始化完成")
+
+    def _check_pending_cuda_addon(self):
+        """检查是否有手动放置的 CUDA addon zip 待安装"""
+        try:
+            from utils.torch_manager import check_manual_addon, install_cuda_addon
+
+            zip_path = check_manual_addon()
+            if zip_path:
+                logger.info(f"检测到待安装的 CUDA addon: {zip_path}")
+                success = install_cuda_addon(zip_path)
+                if success:
+                    self.config.set("asr_device", "cuda:0")
+                    logger.info("CUDA addon 自动安装完成")
+                else:
+                    logger.warning("CUDA addon 自动安装失败")
+        except Exception as e:
+            logger.debug(f"CUDA addon 检查跳过: {e}")
 
     def run(self):
         """启动应用"""
@@ -283,6 +306,7 @@ class VoiceCalendarApp:
 
             if not text:
                 self._result_queue.put(("voice_state", VoiceState.ERROR, "未识别到语音"))
+                self._wake_ui()
                 return
 
             # 2. 后处理链
@@ -292,6 +316,7 @@ class VoiceCalendarApp:
             display_text = self._run_post_process(text)
             logger.info(f"识别结果: {display_text}")
             self._result_queue.put(("voice_result", display_text, None))
+            self._wake_ui()
 
             # 3. 指令解析（使用无标点的纠错文本，支持多指令拆分）
             commands = self._command_parser.parse_multiple(parse_text)
@@ -299,9 +324,11 @@ class VoiceCalendarApp:
 
             if not commands:
                 self._result_queue.put(("voice_state", VoiceState.ERROR, "未识别到有效指令"))
+                self._wake_ui()
                 return
 
-            # 4. 逐条执行指令
+            # 4. 执行指令（多条添加指令批量收集反馈）
+            add_results = []  # 收集添加事件的结果
             for cmd in commands:
                 extra = []
                 if cmd.recurrence_rule:
@@ -313,7 +340,19 @@ class VoiceCalendarApp:
                     extra.append(f"end={cmd.end_time.strftime('%H:%M')}")
                 extra_str = f" [{', '.join(extra)}]" if extra else ""
                 logger.info(f"执行指令: type={cmd.command_type.value}, title='{cmd.title}'{extra_str}")
-                self._execute_command(cmd)
+                if cmd.command_type == CommandType.ADD_EVENT:
+                    result = self._execute_add_event_batch(cmd)
+                    if result:
+                        add_results.append(result)
+                else:
+                    self._execute_command(cmd)
+
+            # 批量反馈添加结果
+            if add_results:
+                self._send_batch_add_feedback(add_results)
+
+            # 唤醒UI立即处理指令执行结果
+            self._wake_ui()
 
             # 5. 记录到交互日志（用于回放测试和模型训练）
             for cmd in commands:
@@ -322,6 +361,7 @@ class VoiceCalendarApp:
         except Exception as e:
             logger.error(f"语音处理失败: {e}", exc_info=True)
             self._result_queue.put(("voice_state", VoiceState.ERROR, str(e)))
+            self._wake_ui()
 
     def _log_interaction(self, text: str, cmd):
         """将语音交互记录追加到日志文件（用于回放测试和模型训练）
@@ -438,6 +478,63 @@ class VoiceCalendarApp:
             logger.info(f"成就解锁: {ach_names}")
 
         self._result_queue.put(("command_executed", msg, "add", command.time, new_event.id))
+
+    def _execute_add_event_batch(self, command):
+        """执行添加事件并返回结果（不直接发送反馈，用于批量收集）
+
+        Returns:
+            (msg, event_time, event_id) 元组，失败返回 None
+        """
+        try:
+            check = self._completer.check_completeness(command)
+            if not check["complete"]:
+                logger.info(f"指令不完整: {check['suggestion']}")
+                command = self._completer.complete_command(command)
+
+            new_event = self._calendar.add_event(
+                title=command.title,
+                start_time=command.time,
+                end_time=getattr(command, "end_time", None),
+                priority=getattr(command, "priority", 0),
+                recurrence_rule=getattr(command, "recurrence_rule", ""),
+                recurrence_end=getattr(command, "recurrence_end", None),
+            )
+            time_str = command.time.strftime("%m月%d日 %H:%M")
+            msg = f"{command.title} ({time_str})"
+            logger.info(f"已添加: {msg}")
+            return (msg, command.time, new_event.id)
+        except Exception as e:
+            logger.error(f"添加事件失败: {e}")
+            return None
+
+    def _send_batch_add_feedback(self, add_results):
+        """发送批量添加事件的合并反馈
+
+        Args:
+            add_results: [(msg, event_time, event_id), ...] 列表
+        """
+        # 检查成就解锁
+        achievement_msg = ""
+        new_achievements = self._achievement_engine.check_achievements()
+        if new_achievements:
+            ach_names = ", ".join(a["name"] for a in new_achievements)
+            achievement_msg = f" | \U0001f3c6 解锁成就: {ach_names}"
+            logger.info(f"成就解锁: {ach_names}")
+
+        if len(add_results) == 1:
+            # 单条事件：保持原格式
+            msg, event_time, event_id = add_results[0]
+            full_msg = f"已添加: {msg}{achievement_msg}"
+            self._result_queue.put(("command_executed", full_msg, "add", event_time, event_id))
+        else:
+            # 多条事件：合并反馈
+            lines = [f"已添加 {len(add_results)} 个事件:"]
+            for msg, _, _ in add_results:
+                lines.append(f"  · {msg}")
+            full_msg = "\n".join(lines) + achievement_msg
+            # 导航到最后一个事件
+            _, last_time, last_id = add_results[-1]
+            self._result_queue.put(("command_executed", full_msg, "add", last_time, last_id))
 
     def _execute_delete_event(self, command):
         """执行删除事件（查找匹配的事件并删除）"""
@@ -590,13 +687,13 @@ class VoiceCalendarApp:
     def _parse_relative_offset(text: str, default: int = 60) -> int:
         """从文本中提取相对偏移量（分钟）
 
-        支持: "N个小时", "N小时", "N分钟", "半小时"
+        支持: "N个小时", "N小时", "N分钟", "半小时", "半个小时"
         默认返回 default 分钟
         """
         import re
 
-        # 半小时
-        if "半小时" in text or "半天" in text:
+        # 半小时 / 半个小时
+        if "半小时" in text or "半个小时" in text or "半天" in text:
             if "半天" in text:
                 return 720
             return 30
@@ -729,13 +826,13 @@ class VoiceCalendarApp:
     def _parse_relative_offset(text: str, default: int = 60) -> int:
         """从文本中提取相对偏移量（分钟）
 
-        支持: "N个小时", "N小时", "N分钟", "半小时"
+        支持: "N个小时", "N小时", "N分钟", "半小时", "半个小时"
         默认返回 default 分钟
         """
         import re
 
-        # 半小时
-        if "半小时" in text or "半天" in text:
+        # 半小时 / 半个小时
+        if "半小时" in text or "半个小时" in text or "半天" in text:
             if "半天" in text:
                 return 720
             return 30
@@ -778,9 +875,21 @@ class VoiceCalendarApp:
                 self._handle_result(result)
         except queue.Empty:
             pass
-        # 每 100ms 轮询一次
+        # 每 100ms 轮询一次（保底，实际通过 _wake_ui 即时触发）
         if self._main_window:
             self._main_window.after(100, self._poll_results)
+
+    def _wake_ui(self):
+        """从任意线程唤醒主线程立即处理队列
+
+        解决 Windows 下窗口未获焦时 after() 回调延迟的问题。
+        tkinter 的 after() 在 CPython 中是线程安全的（通过 Tcl 事件队列）。
+        """
+        try:
+            if self._main_window:
+                self._main_window.after(1, self._poll_results)
+        except Exception:
+            pass
 
     def _handle_result(self, result: tuple):
         """处理结果队列中的消息
@@ -823,9 +932,13 @@ class VoiceCalendarApp:
 
     def _open_settings(self):
         """打开设置窗口"""
-        if self._settings_window and self._settings_window.winfo_exists():
-            self._settings_window.focus()
-            return
+        try:
+            if self._settings_window and self._settings_window.winfo_exists():
+                self._settings_window.focus()
+                return
+        except Exception:
+            # 主题切换后窗口可能已损坏，清除引用
+            self._settings_window = None
 
         self._settings_window = SettingsWindow(
             self._main_window,

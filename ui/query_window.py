@@ -108,23 +108,32 @@ class QueryWindow(ctk.CTkToplevel):
             width=40,
         ).pack(side="left", padx=(6, 4), pady=4)
 
-        # 优先级标记
-        priority_marker = ""
+        # 优先级标记（独立带颜色标签）
         if event.priority >= 2:
-            priority_marker = "❗"
+            ctk.CTkLabel(
+                card,
+                text="❗",
+                font=ctk.CTkFont(size=12),
+                text_color="#e74c3c",
+            ).pack(side="left", padx=(2, 0), pady=4)
         elif event.priority == 1:
-            priority_marker = "★ "
+            ctk.CTkLabel(
+                card,
+                text="★",
+                font=ctk.CTkFont(size=12),
+                text_color="#e67e22",
+            ).pack(side="left", padx=(2, 0), pady=4)
 
-        # 标题（含优先级前缀）
+        # 标题
         title = event.title
         if len(title) > 14:
             title = title[:14] + "..."
         ctk.CTkLabel(
             card,
-            text=f"{priority_marker}{title}",
+            text=title,
             font=ctk.CTkFont(size=12),
             anchor="w",
-        ).pack(side="left", fill="x", expand=True, padx=(0, 4), pady=4)
+        ).pack(side="left", fill="x", expand=True, padx=(4, 4), pady=4)
 
         # 分类标签（右侧）
         if event.category:

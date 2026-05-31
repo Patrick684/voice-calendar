@@ -12,6 +12,8 @@ from typing import Optional
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
+from config import get_app_dir
+
 logger = logging.getLogger(__name__)
 
 # 默认模型路径
@@ -39,6 +41,9 @@ class IntentClassifier:
             device: 指定设备 ("cuda"/"cpu")，None 则自动选择
         """
         self._model_path = Path(model_path)
+        # 如果是相对路径且不存在，尝试基于应用根目录解析（支持打包模式）
+        if not self._model_path.exists() and not self._model_path.is_absolute():
+            self._model_path = get_app_dir() / model_path
         if not self._model_path.exists():
             raise FileNotFoundError(
                 f"模型目录不存在: {model_path}。请先运行 scripts/train_intent_classifier.py 训练模型。"
